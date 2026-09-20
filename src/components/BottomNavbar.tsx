@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Building2,
+  FileText,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ActiveTab, UserRole } from '../types';
@@ -509,30 +510,18 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 </button>
               )}
 
-              {/* Secondary Pages (About & Terms) */}
-              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around text-xs text-zinc-500">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('about');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-1.5 hover:text-zinc-900 dark:hover:text-white py-1"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                  <span>About Us</span>
-                </button>
-                <span>•</span>
+              {/* Secondary Pages (Terms & Privacy) */}
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-xs text-zinc-500">
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab('legal');
                     setMobileMenuOpen(false);
                   }}
-                  className="flex items-center space-x-1.5 hover:text-zinc-900 dark:hover:text-white py-1"
+                  className="flex items-center space-x-1.5 hover:text-zinc-900 dark:hover:text-white py-1 text-emerald-600 dark:text-emerald-400 font-semibold"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>T&C & Privacy</span>
+                  <span>Privacy & Terms</span>
                 </button>
               </div>
             </div>

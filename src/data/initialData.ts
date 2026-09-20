@@ -30,11 +30,11 @@ export const INITIAL_STAFF: User[] = [
 export const INITIAL_SETTINGS: StoreSettings = {
   storeName: 'FreshMart Organic & Grocery',
   tagline: 'Fresh Local Groceries & Farm Produce',
-  address: '742 Evergreen Terrace, Springfield, OR 97477',
-  phone: '(555) 382-9014',
-  email: 'hello@freshmartgroceries.com',
+  address: 'Hackathon Demo Project',
+  phone: 'N/A (Hackathon Project)',
+  email: 'hi.naitik.dev@gmail.com',
   currencySymbol: '$',
-  taxNumber: 'US-TAX-89412049',
+  taxNumber: 'DEMO-TAX-2026',
   defaultTaxRate: 5.0, // 5%
   enableSoundAlerts: true,
   autoReorderAlertThreshold: 8,

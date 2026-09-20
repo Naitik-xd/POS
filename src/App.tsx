@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const POSAppContent: React.FC = () => {
-  const { activeTab, toasts, removeToast, settings } = usePOS();
+  const { activeTab, setActiveTab, toasts, removeToast, settings } = usePOS();
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
@@ -44,26 +44,41 @@ const POSAppContent: React.FC = () => {
 
       {/* Footer (Hidden on AI Chat to maximize viewport space and prevent half-screen cropping) */}
       {activeTab !== 'gemini' && activeTab !== 'ai_insights' && (
-        <footer className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 py-6 px-4 sm:px-6 lg:px-8 text-xs text-zinc-500 mb-14 sm:mb-16">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <footer className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 py-4 px-4 sm:px-6 lg:px-8 text-xs text-zinc-500 mb-20 sm:mb-24">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
               <Store className="w-4 h-4 text-emerald-600" />
-              <span className="font-bold text-zinc-700 dark:text-zinc-300">
-                {settings.storeName} Point of Sale
+              <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                {settings.storeName || 'FreshMart'} POS
               </span>
-              <span>•</span>
-              <span>Enterprise Grocery Edition</span>
+              <span className="text-zinc-400">•</span>
+              <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                <span>Active Terminal</span>
+              </span>
             </div>
 
-            <div className="flex items-center space-x-4 text-xs">
-              <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                <span>Terminal Online</span>
-              </span>
-              <span>•</span>
-              <span>Version 2.4.0</span>
-              <span>•</span>
-              <span>{settings.storeName}</span>
+            {/* Direct Policy & Support Link */}
+            <div className="flex items-center space-x-3 text-xs">
+              <button
+                id="footer-link-privacy-terms"
+                type="button"
+                onClick={() => {
+                  setActiveTab('legal');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="font-medium text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-4 transition"
+              >
+                Privacy & Terms (Hackathon Notice)
+              </button>
+              <span className="text-zinc-300 dark:text-zinc-700">•</span>
+              <a
+                id="footer-link-support-email"
+                href="mailto:hi.naitik.dev@gmail.com"
+                className="font-medium text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+              >
+                Support: hi.naitik.dev@gmail.com
+              </a>
             </div>
           </div>
         </footer>
