@@ -104,7 +104,7 @@ Return ONLY valid JSON matching this schema. Do not enclose in markdown ticks if
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -170,7 +170,7 @@ Format your answers cleanly with concise markdown bullet points, clear grocery a
     }));
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents,
       config: {
         systemInstruction,
@@ -180,7 +180,7 @@ Format your answers cleanly with concise markdown bullet points, clear grocery a
     res.json({
       success: true,
       reply: response.text || "I'm ready to assist with your grocery store operations.",
-      source: "gemini-3.8-flash",
+      source: "gemini-2.5-flash",
     });
   } catch (error: unknown) {
     const err = error as Error;

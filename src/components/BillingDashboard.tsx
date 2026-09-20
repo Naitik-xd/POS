@@ -20,11 +20,14 @@ import {
   Printer,
   ChevronRight,
   ShieldAlert,
+  Camera,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { usePOS } from '../context/POSContext';
 import { PaymentMethod, Product, ProductCategory, SaleTransaction } from '../types';
 import { downloadReceiptPdf } from '../utils/receiptPdf';
+import { CameraBarcodeScanner } from './CameraBarcodeScanner';
+import { getCategoryIcon, getCategoryBadgeStyle } from '../utils/categoryIcons';
 
 export const BillingDashboard: React.FC = () => {
   const {
@@ -57,6 +60,7 @@ export const BillingDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
 
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -167,33 +171,44 @@ export const BillingDashboard: React.FC = () => {
                 <input
                   id="input-product-search"
                   type="text"
-                  placeholder="Search grocery by name, category..."
+                  placeholder="Search grocery by name, barcode, category..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 transition"
                 />
               </div>
 
+              {/* Optical Camera Barcode Scanner Trigger Button */}
+              <button
+                id="btn-open-camera-scanner"
+                type="button"
+                onClick={() => setIsCameraScannerOpen(true)}
+                className="flex items-center justify-center space-x-2 px-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap"
+              >
+                <Camera className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Scan with Camera</span>
+              </button>
+
               {/* Instant Barcode Scanner Input */}
-              <form onSubmit={handleBarcodeSubmit} className="flex space-x-2 sm:w-64">
+              <form onSubmit={handleBarcodeSubmit} className="flex space-x-1.5 sm:w-56">
                 <div className="relative flex-1">
-                  <Barcode className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
                   <input
                     id="input-barcode-scan"
                     type="text"
-                    placeholder="Scan Barcode + Enter"
+                    placeholder="Barcode + Enter"
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl text-sm font-mono bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 transition"
+                    className="w-full pl-8 pr-2 py-2.5 rounded-xl text-xs font-mono bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 transition"
                   />
                 </div>
                 <button
                   id="btn-scan-submit"
                   type="submit"
-                  title="Scan & Add"
-                  className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center transition shadow-xs"
+                  title="Lookup Barcode"
+                  className="px-3 py-2.5 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 text-white dark:text-zinc-900 rounded-xl text-xs font-semibold flex items-center justify-center transition shadow-xs"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
               </form>
             </div>
@@ -225,6 +240,7 @@ export const BillingDashboard: React.FC = () => {
             {filteredProducts.map((product) => {
               const isOutOfStock = product.stockQuantity <= 0;
               const isLowStock = !isOutOfStock && product.stockQuantity <= product.lowStockThreshold;
+              const badge = getCategoryBadgeStyle(product.category);
 
               return (
                 <div
@@ -238,29 +254,20 @@ export const BillingDashboard: React.FC = () => {
                   }`}
                 >
                   <div>
-                    {/* Image / Thumbnail */}
-                    <div className="relative w-full h-24 sm:h-28 rounded-xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden mb-2">
-                      {product.imageUrl ? (
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs font-mono">
-                          {product.barcode}
-                        </div>
-                      )}
+                    {/* Category Favicon / Icon Badge replacing image clutter */}
+                    <div className="relative w-full h-20 sm:h-24 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 flex items-center justify-center overflow-hidden mb-2 transition-colors">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-2xs ${badge.bg} ${badge.text} ${badge.border} transition-transform group-hover:scale-110 duration-200`}>
+                        {getCategoryIcon(product.category, 'w-6 h-6')}
+                      </div>
 
                       {/* Stock Badge Overlay */}
                       <div className="absolute top-1.5 right-1.5">
                         {isOutOfStock ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-xs">
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-xs">
                             Out of Stock
                           </span>
                         ) : isLowStock ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
                             Low: {product.stockQuantity} {product.unit}
                           </span>
                         ) : (
@@ -275,8 +282,10 @@ export const BillingDashboard: React.FC = () => {
                     <h4 className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-white line-clamp-2 leading-tight">
                       {product.name}
                     </h4>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
-                      {product.category}
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate flex items-center space-x-1">
+                      <span>{product.category}</span>
+                      <span>•</span>
+                      <span className="font-mono text-[10px] text-zinc-400">{product.barcode}</span>
                     </p>
                   </div>
 
@@ -754,7 +763,7 @@ export const BillingDashboard: React.FC = () => {
               className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl font-mono text-xs text-zinc-800 dark:text-zinc-200 space-y-2 border border-zinc-200 dark:border-zinc-700"
             >
               <div className="text-center pb-2 border-b border-dashed border-zinc-300 dark:border-zinc-600">
-                <h2 className="font-extrabold text-sm uppercase">{settings.storeName}</h2>
+                <h2 className="font-extrabold text-sm uppercase">{settings.customReceiptHeader || settings.storeName}</h2>
                 <p className="text-[10px] text-zinc-500">{settings.address}</p>
                 <p className="text-[10px] text-zinc-500">Tel: {settings.phone}</p>
                 <p className="text-[10px] text-zinc-500 font-bold mt-1">
@@ -816,9 +825,8 @@ export const BillingDashboard: React.FC = () => {
                 )}
               </div>
 
-              <div className="text-center pt-2 text-[10px] text-zinc-500">
-                <p>Thank you for shopping local!</p>
-                <p>Please retain for exchanges & returns.</p>
+              <div className="text-center pt-2 text-[10px] text-zinc-500 italic">
+                <p>"{settings.receiptFooterMessage || 'Thank you for shopping with us! Please retain for exchanges.'}"</p>
               </div>
             </div>
 
@@ -856,6 +864,24 @@ export const BillingDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Optical Camera Barcode Scanner Modal */}
+      <CameraBarcodeScanner
+        isOpen={isCameraScannerOpen}
+        onClose={() => setIsCameraScannerOpen(false)}
+        onDetected={(scannedCode: string) => {
+          const matched = products.find(
+            (p) => p.barcode.toLowerCase() === scannedCode.trim().toLowerCase()
+          );
+          if (matched) {
+            addToCart(matched, 1);
+            showToast('Item Scanned', `Added ${matched.name} to cart via camera barcode scan.`, 'success');
+          } else {
+            showToast('Barcode Not Found', `No item matching barcode "${scannedCode}"`, 'warning');
+          }
+        }}
+        products={products}
+      />
     </div>
   );
 };

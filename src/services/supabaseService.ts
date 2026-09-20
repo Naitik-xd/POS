@@ -81,13 +81,19 @@ export async function testSupabaseConnection(url: string, anonKey: string): Prom
   }
 }
 
-// Sync local inventory to Supabase if configured
-export async function syncInventoryToSupabase(products: Product[]): Promise<boolean> {
+// Sync local inventory to Supabase if configured (multi-tenant safe: includes business_id & store_name)
+export async function syncInventoryToSupabase(
+  products: Product[],
+  businessId: string = 'default_store',
+  storeName: string = 'FreshMart'
+): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
 
   try {
     const payload = products.map((p) => ({
+      business_id: businessId,
+      store_name: storeName,
       barcode: p.barcode,
       name: p.name,
       category: p.category,
@@ -103,7 +109,9 @@ export async function syncInventoryToSupabase(products: Product[]): Promise<bool
       updated_at: new Date().toISOString(),
     }));
 
-    const { error } = await client.from('pos_inventory').upsert(payload, { onConflict: 'barcode' });
+    const { error } = await client
+      .from('pos_inventory')
+      .upsert(payload, { onConflict: 'business_id,barcode' });
     if (error) {
       console.warn('Supabase upsert warning:', error.message);
       return false;
@@ -115,8 +123,12 @@ export async function syncInventoryToSupabase(products: Product[]): Promise<bool
   }
 }
 
-// Sync completed sale transaction to Supabase
-export async function syncSaleToSupabase(sale: SaleTransaction): Promise<boolean> {
+// Sync completed sale transaction to Supabase (multi-tenant safe: includes business_id & store_name)
+export async function syncSaleToSupabase(
+  sale: SaleTransaction,
+  businessId: string = 'default_store',
+  storeName: string = 'FreshMart'
+): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
 
@@ -124,6 +136,8 @@ export async function syncSaleToSupabase(sale: SaleTransaction): Promise<boolean
     const { data: saleRecord, error: saleErr } = await client
       .from('pos_sales')
       .insert({
+        business_id: businessId,
+        store_name: storeName,
         receipt_number: sale.receiptNumber,
         subtotal: sale.subtotal,
         tax_amount: sale.taxAmount,
@@ -147,6 +161,8 @@ export async function syncSaleToSupabase(sale: SaleTransaction): Promise<boolean
     }
 
     const itemsPayload = sale.items.map((item) => ({
+      business_id: businessId,
+      store_name: storeName,
       sale_id: saleRecord.id,
       product_name: item.productName,
       barcode: item.barcode,

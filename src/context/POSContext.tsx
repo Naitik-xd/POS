@@ -9,6 +9,7 @@ import {
   StoreSettings,
   User,
   UserRole,
+  RegisteredBusiness,
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_SETTINGS, INITIAL_STAFF, INITIAL_TRANSACTIONS } from '../data/initialData';
 import { syncInventoryToSupabase, syncSaleToSupabase } from '../services/supabaseService';
@@ -73,6 +74,13 @@ interface POSContextType {
   deleteProduct: (id: string) => void;
   adjustStock: (id: string, delta: number) => void;
   restockAllLowStock: (reorderAmount?: number) => void;
+  setAllProducts: (products: Product[]) => void;
+  setAllStaff: (staff: User[]) => void;
+  resetToOnboardedStore: (storeData: {
+    settings: Partial<StoreSettings>;
+    products: Product[];
+    staff: User[];
+  }) => void;
 
   // Auth Operations
   loginWithPin: (pin: string) => boolean;
@@ -81,10 +89,23 @@ interface POSContextType {
   switchUser: (userId: string) => void;
   switchRole: (role: UserRole) => void;
   addStaff: (staff: Omit<User, 'id'>) => void;
+  updateStaffRole: (id: string, role: UserRole) => void;
   deleteStaff: (id: string) => void;
   archiveReceiptPdf: (saleId: string) => void;
   isManager: boolean;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
+
+  // Business Multi-tenant & Demo Operations
+  loadDemoStore: () => void;
+  loginBusiness: (businessId: string, pass: string) => boolean;
+  registerBusiness: (data: {
+    businessId: string;
+    adminPassword: string;
+    settings: Partial<StoreSettings>;
+    products: Product[];
+    staff: User[];
+  }) => void;
+  registeredBusinesses: RegisteredBusiness[];
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -151,8 +172,19 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('billing');
+  // Active Tab: Defaults to welcome page if not onboarded yet
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    try {
+      const savedSettings = localStorage.getItem('freshmart_settings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.isOnboarded) return 'billing';
+      }
+    } catch {
+      // fallback
+    }
+    return 'welcome';
+  });
 
   // Products State
   const [products, setProducts] = useState<Product[]>(() => {
@@ -219,6 +251,38 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('freshmart_settings', JSON.stringify(settings));
   }, [settings]);
+
+  // Registered Businesses Multi-tenant Database
+  const [registeredBusinesses, setRegisteredBusinesses] = useState<RegisteredBusiness[]>(() => {
+    try {
+      const saved = localStorage.getItem('freshmart_registered_businesses');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      {
+        businessId: 'demo_freshmart',
+        storeName: 'FreshMart Supermarket (Demo)',
+        adminPassword: 'demo1234',
+        settings: {
+          ...INITIAL_SETTINGS,
+          storeName: 'FreshMart Supermarket (Demo)',
+          businessId: 'demo_freshmart',
+          adminPassword: 'demo1234',
+          isOnboarded: true,
+          isDemoMode: true,
+        },
+        products: INITIAL_PRODUCTS,
+        staff: INITIAL_STAFF,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('freshmart_registered_businesses', JSON.stringify(registeredBusinesses));
+  }, [registeredBusinesses]);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -465,16 +529,35 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Sale Completed!', `Receipt #${receiptNumber} for $${transaction.totalAmount.toFixed(2)}`, 'success');
 
       // 4. Background sync to Supabase if connected
-      syncSaleToSupabase(transaction);
+      syncSaleToSupabase(
+        transaction,
+        settings.businessId || 'default_store',
+        settings.storeName || 'FreshMart'
+      );
 
       return transaction;
     },
-    [cart, cartTotals, currentUser, customerName, customerPhone, settings.enableSoundAlerts, clearCart, showToast]
+    [
+      cart,
+      cartTotals,
+      currentUser,
+      customerName,
+      customerPhone,
+      settings.enableSoundAlerts,
+      settings.businessId,
+      settings.storeName,
+      clearCart,
+      showToast,
+    ]
   );
 
-  // Product CRUD
+  // Product CRUD with Role-Based Access Control
   const addProduct = useCallback(
     (newProd: Omit<Product, 'id'>) => {
+      if (currentUser.role === 'cashier') {
+        showToast('Access Denied', 'Cashiers cannot add inventory. Switch to Manager role.', 'error');
+        return;
+      }
       const created: Product = {
         ...newProd,
         id: `prod-${Date.now()}`,
@@ -482,18 +565,30 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setProducts((prev) => [created, ...prev]);
       showToast('Product Added', `${created.name} is now available in inventory.`, 'success');
-      syncInventoryToSupabase([created]);
+      syncInventoryToSupabase(
+        [created],
+        settings.businessId || 'default_store',
+        settings.storeName || 'FreshMart'
+      );
     },
-    [showToast]
+    [currentUser.role, settings.businessId, settings.storeName, showToast]
   );
 
   const updateProduct = useCallback(
     (id: string, updates: Partial<Product>) => {
+      if (currentUser.role === 'cashier') {
+        showToast('Access Denied', 'Cashiers cannot edit inventory. Switch to Manager role.', 'error');
+        return;
+      }
       setProducts((prev) =>
         prev.map((p) => {
           if (p.id === id) {
             const updated = { ...p, ...updates };
-            syncInventoryToSupabase([updated]);
+            syncInventoryToSupabase(
+              [updated],
+              settings.businessId || 'default_store',
+              settings.storeName || 'FreshMart'
+            );
             return updated;
           }
           return p;
@@ -501,25 +596,37 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       showToast('Inventory Updated', 'Item details saved successfully.', 'info');
     },
-    [showToast]
+    [currentUser.role, settings.businessId, settings.storeName, showToast]
   );
 
   const deleteProduct = useCallback(
     (id: string) => {
+      if (currentUser.role === 'cashier') {
+        showToast('Access Denied', 'Cashiers cannot delete inventory. Switch to Manager role.', 'error');
+        return;
+      }
       setProducts((prev) => prev.filter((p) => p.id !== id));
       showToast('Item Deleted', 'Product removed from catalog.', 'info');
     },
-    [showToast]
+    [currentUser.role, showToast]
   );
 
   const adjustStock = useCallback(
     (id: string, delta: number) => {
+      if (currentUser.role === 'cashier') {
+        showToast('Access Denied', 'Cashiers cannot adjust stock levels. Switch to Manager role.', 'error');
+        return;
+      }
       setProducts((prev) =>
         prev.map((p) => {
           if (p.id === id) {
             const newQty = Math.max(0, p.stockQuantity + delta);
             const updated = { ...p, stockQuantity: newQty };
-            syncInventoryToSupabase([updated]);
+            syncInventoryToSupabase(
+              [updated],
+              settings.businessId || 'default_store',
+              settings.storeName || 'FreshMart'
+            );
             return updated;
           }
           return p;
@@ -527,11 +634,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       showToast('Stock Adjusted', `Updated stock quantity.`, 'info');
     },
-    [showToast]
+    [currentUser.role, settings.businessId, settings.storeName, showToast]
   );
 
   const restockAllLowStock = useCallback(
     (reorderAmount = 25) => {
+      if (currentUser.role === 'cashier') {
+        showToast('Access Denied', 'Cashiers cannot trigger inventory restock. Switch to Manager role.', 'error');
+        return;
+      }
       setProducts((prev) =>
         prev.map((p) => {
           if (p.stockQuantity <= p.lowStockThreshold) {
@@ -543,7 +654,180 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       showToast('Restock Order Received', `Replenished +${reorderAmount} units to all low stock items!`, 'success');
     },
+    [currentUser.role, showToast]
+  );
+
+  const setAllProducts = useCallback((newProducts: Product[]) => {
+    setProducts(newProducts);
+  }, []);
+
+  const setAllStaff = useCallback((newStaff: User[]) => {
+    setStaffList(newStaff);
+    if (newStaff.length > 0) {
+      setCurrentUser(newStaff[0]);
+    }
+  }, []);
+
+  const resetToOnboardedStore = useCallback(
+    (storeData: {
+      settings: Partial<StoreSettings>;
+      products: Product[];
+      staff: User[];
+    }) => {
+      setSettings((prev) => ({
+        ...prev,
+        ...storeData.settings,
+        isOnboarded: true,
+      }));
+      if (storeData.products && storeData.products.length > 0) {
+        setProducts(storeData.products);
+      }
+      if (storeData.staff && storeData.staff.length > 0) {
+        setStaffList(storeData.staff);
+        const managerUser =
+          storeData.staff.find((s) => s.role === 'manager' || s.role === 'admin') ||
+          storeData.staff[0];
+        setCurrentUser(managerUser);
+      }
+      setActiveTab('billing');
+      showToast(
+        'Store Setup Completed!',
+        `Welcome to ${storeData.settings.storeName || 'your store'}. Terminal is ready.`,
+        'success'
+      );
+    },
     [showToast]
+  );
+
+  const loadDemoStore = useCallback(() => {
+    const demoSettings: StoreSettings = {
+      ...INITIAL_SETTINGS,
+      storeName: 'FreshMart Supermarket (Demo Mode)',
+      tagline: 'Interactive Demo • Farm Fresh Produce & Everyday Groceries',
+      businessId: 'demo_freshmart',
+      adminPassword: 'demo1234',
+      isOnboarded: true,
+      isDemoMode: true,
+    };
+    setSettings(demoSettings);
+    setProducts(INITIAL_PRODUCTS);
+    setStaffList(INITIAL_STAFF);
+    setSales(INITIAL_TRANSACTIONS);
+    setCurrentUser(INITIAL_STAFF[0]); // Sarah Jenkins (Manager)
+    setActiveTab('billing');
+    playTone('success');
+    showToast(
+      'Demo POS Terminal Active',
+      'You are in full Demo Mode! Ring items, test camera barcodes, and inspect reports.',
+      'success'
+    );
+  }, [showToast]);
+
+  const registerBusiness = useCallback(
+    (data: {
+      businessId: string;
+      adminPassword: string;
+      settings: Partial<StoreSettings>;
+      products: Product[];
+      staff: User[];
+    }) => {
+      const cleanBizId = data.businessId.trim().toLowerCase();
+      const newSettings: StoreSettings = {
+        ...INITIAL_SETTINGS,
+        ...data.settings,
+        storeName: data.settings.storeName || 'My Grocery Store',
+        businessId: cleanBizId,
+        adminPassword: data.adminPassword,
+        isOnboarded: true,
+        isDemoMode: false,
+      };
+
+      const newBusinessRecord: RegisteredBusiness = {
+        businessId: cleanBizId,
+        storeName: newSettings.storeName,
+        adminPassword: data.adminPassword,
+        settings: newSettings,
+        products: data.products,
+        staff: data.staff,
+        createdAt: new Date().toISOString(),
+      };
+
+      setRegisteredBusinesses((prev) => {
+        const filtered = prev.filter((b) => b.businessId.toLowerCase() !== cleanBizId);
+        return [newBusinessRecord, ...filtered];
+      });
+
+      setSettings(newSettings);
+      if (data.products && data.products.length > 0) {
+        setProducts(data.products);
+      }
+      if (data.staff && data.staff.length > 0) {
+        setStaffList(data.staff);
+        const managerUser =
+          data.staff.find((s) => s.role === 'manager' || s.role === 'admin') || data.staff[0];
+        setCurrentUser(managerUser);
+      }
+
+      setActiveTab('billing');
+      playTone('success');
+      showToast(
+        'Business Registered Successfully!',
+        `${newSettings.storeName} is ready with ID "${cleanBizId}". Terminal is live.`,
+        'success'
+      );
+    },
+    [showToast]
+  );
+
+  const loginBusiness = useCallback(
+    (businessId: string, pass: string): boolean => {
+      const cleanId = businessId.trim().toLowerCase();
+      const cleanPass = pass.trim();
+
+      // Check if it's the demo account
+      if (cleanId === 'demo_freshmart' && (cleanPass === 'demo1234' || cleanPass === 'demo')) {
+        loadDemoStore();
+        return true;
+      }
+
+      // Check active store
+      if (
+        settings.businessId &&
+        settings.businessId.toLowerCase() === cleanId &&
+        settings.adminPassword === cleanPass
+      ) {
+        setSettings((prev) => ({ ...prev, isOnboarded: true }));
+        setActiveTab('billing');
+        showToast('Business Login Verified', `Welcome back to ${settings.storeName}!`, 'success');
+        return true;
+      }
+
+      // Check registered businesses
+      const match = registeredBusinesses.find(
+        (b) => b.businessId.toLowerCase() === cleanId && b.adminPassword === cleanPass
+      );
+
+      if (match) {
+        setSettings({ ...match.settings, isOnboarded: true });
+        if (match.products && match.products.length > 0) {
+          setProducts(match.products);
+        }
+        if (match.staff && match.staff.length > 0) {
+          setStaffList(match.staff);
+          const mgr =
+            match.staff.find((s) => s.role === 'manager' || s.role === 'admin') || match.staff[0];
+          setCurrentUser(mgr);
+        }
+        setActiveTab('billing');
+        playTone('success');
+        showToast('Business Login Verified', `Welcome back to ${match.storeName}!`, 'success');
+        return true;
+      }
+
+      showToast('Authentication Failed', 'Incorrect Business ID or Password. Please try again.', 'error');
+      return false;
+    },
+    [loadDemoStore, registeredBusinesses, settings, showToast]
   );
 
   const clearAllAlerts = useCallback(() => {
@@ -635,6 +919,19 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [showToast]
   );
 
+  const updateStaffRole = useCallback(
+    (id: string, newRole: UserRole) => {
+      setStaffList((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, role: newRole } : s))
+      );
+      if (currentUser.id === id) {
+        setCurrentUser((prev) => ({ ...prev, role: newRole }));
+      }
+      showToast('Staff Role Updated', `Role changed to ${newRole.toUpperCase()}`, 'success');
+    },
+    [currentUser.id, showToast]
+  );
+
   const deleteStaff = useCallback(
     (id: string) => {
       if (currentUser.id === id) {
@@ -711,16 +1008,24 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteProduct,
         adjustStock,
         restockAllLowStock,
+        setAllProducts,
+        setAllStaff,
+        resetToOnboardedStore,
         loginWithPin,
         loginWithEmail,
         logoutUser,
         switchUser,
         switchRole,
         addStaff,
+        updateStaffRole,
         deleteStaff,
         archiveReceiptPdf,
         isManager,
         updateSettings,
+        loadDemoStore,
+        loginBusiness,
+        registerBusiness,
+        registeredBusinesses,
       }}
     >
       {children}

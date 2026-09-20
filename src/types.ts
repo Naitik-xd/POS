@@ -138,9 +138,26 @@ export interface StoreSettings {
   defaultTaxRate: number;
   enableSoundAlerts: boolean;
   autoReorderAlertThreshold: number;
+  receiptFooterMessage?: string;
+  customReceiptHeader?: string;
+  isOnboarded?: boolean;
+  businessId?: string;
+  adminPassword?: string;
+  isDemoMode?: boolean;
+}
+
+export interface RegisteredBusiness {
+  businessId: string;
+  storeName: string;
+  adminPassword: string;
+  settings: StoreSettings;
+  products: Product[];
+  staff: User[];
+  createdAt: string;
 }
 
 export type ActiveTab =
+  | 'welcome'
   | 'billing'
   | 'inventory'
   | 'sales'

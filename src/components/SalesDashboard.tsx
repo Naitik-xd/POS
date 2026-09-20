@@ -39,9 +39,11 @@ export const SalesDashboard: React.FC = () => {
     setLastCompletedSale,
     staffList,
     addStaff,
+    updateStaffRole,
     deleteStaff,
     currentUser,
     isManager,
+    switchUser,
     switchRole,
     archiveReceiptPdf,
     showToast,
@@ -577,15 +579,27 @@ export const SalesDashboard: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-zinc-500">{staff.email}</td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              staff.role === 'manager'
-                                ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
-                                : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                            }`}
-                          >
-                            {staff.role}
-                          </span>
+                          {isManager && !isCurrent ? (
+                            <select
+                              value={staff.role}
+                              onChange={(e) => updateStaffRole(staff.id, e.target.value as 'manager' | 'cashier')}
+                              className="text-[11px] font-bold uppercase rounded-lg px-2 py-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                              title="Change employee role"
+                            >
+                              <option value="cashier">Cashier</option>
+                              <option value="manager">Manager</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                staff.role === 'manager'
+                                  ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              }`}
+                            >
+                              {staff.role}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 font-mono text-zinc-600 dark:text-zinc-400">
                           {isManager ? staff.pin : '••••'}
@@ -597,13 +611,15 @@ export const SalesDashboard: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {isCurrent ? (
-                            <span className="text-[11px] font-semibold text-emerald-600">Logged In</span>
+                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                              Active Operator
+                            </span>
                           ) : (
                             <button
-                              onClick={() => switchRole(staff.role)}
+                              onClick={() => switchUser(staff.id)}
                               className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 transition"
                             >
-                              Log in as {staff.role}
+                              Switch to {staff.name.split(' ')[0]}
                             </button>
                           )}
                         </td>

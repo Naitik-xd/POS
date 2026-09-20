@@ -43,6 +43,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth }) => {
 
   const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     {
+      id: 'welcome',
+      label: 'Welcome & Setup',
+      icon: <Store className="w-4 h-4 text-emerald-500" />,
+    },
+    {
       id: 'billing',
       label: 'Billing Counter',
       icon: <ShoppingCart className="w-4 h-4" />,
@@ -80,14 +85,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Store Title */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('billing')}>
+          <div
+            className="flex items-center space-x-3 cursor-pointer"
+            onClick={() => setActiveTab(settings.isOnboarded ? 'billing' : 'welcome')}
+          >
             <div className="w-10 h-10 rounded-xl bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-600/20">
               <Store className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-lg font-extrabold tracking-tight text-zinc-900 dark:text-white">
-                  FreshMart
+                <span className="text-lg font-extrabold tracking-tight text-zinc-900 dark:text-white truncate max-w-[220px]">
+                  {settings.storeName || 'FreshMart'}
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 font-semibold border border-emerald-300 dark:border-emerald-800">
                   POS

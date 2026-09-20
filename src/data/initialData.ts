@@ -38,6 +38,12 @@ export const INITIAL_SETTINGS: StoreSettings = {
   defaultTaxRate: 5.0, // 5%
   enableSoundAlerts: true,
   autoReorderAlertThreshold: 8,
+  receiptFooterMessage: 'Thank you for shopping local with FreshMart!',
+  customReceiptHeader: 'FreshMart Organic & Grocery',
+  isOnboarded: false,
+  businessId: 'demo_freshmart',
+  adminPassword: 'demo1234',
+  isDemoMode: false,
 };
 
 export const INITIAL_PRODUCTS: Product[] = [

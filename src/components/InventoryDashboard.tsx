@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { Product, ProductCategory } from '../types';
+import { getCategoryIcon, getCategoryBadgeStyle } from '../utils/categoryIcons';
 
 export const InventoryDashboard: React.FC = () => {
   const {
@@ -30,6 +31,7 @@ export const InventoryDashboard: React.FC = () => {
     adjustStock,
     restockAllLowStock,
     currentUser,
+    switchRole,
     showToast,
   } = usePOS();
 
@@ -215,6 +217,24 @@ export const InventoryDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Cashier Mode Read-Only Banner */}
+      {currentUser.role === 'cashier' && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center space-x-2.5">
+            <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <span>
+              <strong>Cashier Mode Active (Read-Only):</strong> You can review live stock counts and SKU prices. Adding, editing, restocking, and deleting items is restricted to Manager accounts.
+            </span>
+          </div>
+          <button
+            onClick={() => switchRole('manager')}
+            className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 dark:bg-amber-800 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 font-bold text-xs whitespace-nowrap transition"
+          >
+            Switch to Manager
+          </button>
+        </div>
+      )}
+
       {/* Top Banner & Action */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -227,27 +247,36 @@ export const InventoryDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Restock All Low Stock Button */}
-          {metrics.lowStockCount + metrics.outOfStockCount > 0 && (
-            <button
-              id="btn-restock-all"
-              onClick={() => restockAllLowStock(25)}
-              className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/80 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 transition shadow-2xs"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Restock Low Items (+25)</span>
-            </button>
-          )}
+          {currentUser.role === 'manager' ? (
+            <>
+              {/* Restock All Low Stock Button */}
+              {metrics.lowStockCount + metrics.outOfStockCount > 0 && (
+                <button
+                  id="btn-restock-all"
+                  onClick={() => restockAllLowStock(25)}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/80 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 transition shadow-2xs"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Restock Low Items (+25)</span>
+                </button>
+              )}
 
-          {/* Add Product Button */}
-          <button
-            id="btn-add-product"
-            onClick={handleOpenAddModal}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Grocery Item</span>
-          </button>
+              {/* Add Product Button */}
+              <button
+                id="btn-add-product"
+                onClick={handleOpenAddModal}
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Grocery Item</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-xs font-semibold">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Catalog Locked (Cashier Mode)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -405,19 +434,8 @@ export const InventoryDashboard: React.FC = () => {
                     {/* Name & Barcode */}
                     <td className="px-4 py-3">
                       <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex-shrink-0 overflow-hidden">
-                          {p.imageUrl ? (
-                            <img
-                              src={p.imageUrl}
-                              alt={p.name}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-zinc-400 font-mono text-[10px]">
-                              {p.barcode.slice(-4)}
-                            </div>
-                          )}
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 border ${getCategoryBadgeStyle(p.category).bg} ${getCategoryBadgeStyle(p.category).text} ${getCategoryBadgeStyle(p.category).border}`}>
+                          {getCategoryIcon(p.category, 'w-4 h-4')}
                         </div>
                         <div>
                           <p className="font-semibold text-zinc-900 dark:text-white leading-tight">
@@ -477,52 +495,68 @@ export const InventoryDashboard: React.FC = () => {
 
                     {/* Quick Restock / Put More */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-center space-x-1">
-                        <button
-                          onClick={() => adjustStock(p.id, 5)}
-                          title="Put +5 units"
-                          className="px-2 py-1 bg-zinc-100 hover:bg-emerald-100 dark:bg-zinc-800 dark:hover:bg-emerald-950 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-md text-xs font-semibold transition"
-                        >
-                          +5
-                        </button>
-                        <button
-                          onClick={() => adjustStock(p.id, 20)}
-                          title="Put +20 units (Case delivery)"
-                          className="px-2 py-1 bg-zinc-100 hover:bg-emerald-100 dark:bg-zinc-800 dark:hover:bg-emerald-950 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-md text-xs font-semibold transition"
-                        >
-                          +20
-                        </button>
-                        <button
-                          onClick={() => adjustStock(p.id, -1)}
-                          disabled={p.stockQuantity <= 0}
-                          title="Damage / Write-off 1 unit"
-                          className="px-2 py-1 bg-zinc-100 hover:bg-rose-100 dark:bg-zinc-800 dark:hover:bg-rose-950 text-zinc-700 dark:text-zinc-300 hover:text-rose-700 dark:hover:text-rose-300 rounded-md text-xs font-semibold disabled:opacity-30 transition"
-                        >
-                          -1
-                        </button>
-                      </div>
+                      {currentUser.role === 'manager' ? (
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => adjustStock(p.id, 5)}
+                            title="Put +5 units"
+                            className="px-2 py-1 bg-zinc-100 hover:bg-emerald-100 dark:bg-zinc-800 dark:hover:bg-emerald-950 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-md text-xs font-semibold transition"
+                          >
+                            +5
+                          </button>
+                          <button
+                            onClick={() => adjustStock(p.id, 20)}
+                            title="Put +20 units (Case delivery)"
+                            className="px-2 py-1 bg-zinc-100 hover:bg-emerald-100 dark:bg-zinc-800 dark:hover:bg-emerald-950 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-md text-xs font-semibold transition"
+                          >
+                            +20
+                          </button>
+                          <button
+                            onClick={() => adjustStock(p.id, -1)}
+                            disabled={p.stockQuantity <= 0}
+                            title="Damage / Write-off 1 unit"
+                            className="px-2 py-1 bg-zinc-100 hover:bg-rose-100 dark:bg-zinc-800 dark:hover:bg-rose-950 text-zinc-700 dark:text-zinc-300 hover:text-rose-700 dark:hover:text-rose-300 rounded-md text-xs font-semibold disabled:opacity-30 transition"
+                          >
+                            -1
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center text-zinc-400 text-xs italic">
+                          <Lock className="w-3 h-3 mr-1" />
+                          <span>Manager Only</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Actions: Edit & Delete */}
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end space-x-1.5">
-                        <button
-                          id={`btn-edit-${p.id}`}
-                          onClick={() => handleOpenEditModal(p)}
-                          title="Modify Item"
-                          className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          id={`btn-delete-${p.id}`}
-                          onClick={() => setProductToDelete(p)}
-                          title="Delete Item"
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {currentUser.role === 'manager' ? (
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            id={`btn-edit-${p.id}`}
+                            onClick={() => handleOpenEditModal(p)}
+                            title="Modify Item"
+                            className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            id={`btn-delete-${p.id}`}
+                            onClick={() => setProductToDelete(p)}
+                            title="Delete Item"
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end text-zinc-400 text-xs">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] font-medium flex items-center space-x-1">
+                            <Lock className="w-3 h-3 text-zinc-400" />
+                            <span>Locked</span>
+                          </span>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -699,18 +733,19 @@ export const InventoryDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Image URL (Optional) */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Image URL (Optional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
-                />
+              {/* Category Icon / Favicon Preview */}
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 flex items-center space-x-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${getCategoryBadgeStyle(formData.category).bg} ${getCategoryBadgeStyle(formData.category).text} ${getCategoryBadgeStyle(formData.category).border}`}>
+                  {getCategoryIcon(formData.category, 'w-5 h-5')}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                    Category Icon: {formData.category}
+                  </p>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Clean, copyright-free category favicon automatically assigned.
+                  </p>
+                </div>
               </div>
 
               {/* Action Buttons */}
