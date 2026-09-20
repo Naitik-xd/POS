@@ -153,6 +153,7 @@ export interface RegisteredBusiness {
   settings: StoreSettings;
   products: Product[];
   staff: User[];
+  sales?: SaleTransaction[];
   createdAt: string;
 }
 

@@ -150,7 +150,7 @@ export const BusinessLoginModal: React.FC<BusinessLoginModalProps> = ({
           {registeredBusinesses.length > 0 && (
             <div className="space-y-1.5 pt-1">
               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Saved Stores On This Device:
+                Saved Store IDs On This Device (Requires Password):
               </p>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                 {registeredBusinesses.map((b) => (
@@ -159,9 +159,10 @@ export const BusinessLoginModal: React.FC<BusinessLoginModalProps> = ({
                     type="button"
                     onClick={() => {
                       setBusinessId(b.businessId);
-                      setPassword(b.adminPassword);
+                      setPassword('');
                     }}
                     className="px-2.5 py-1 rounded-lg text-xs bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium transition flex items-center space-x-1"
+                    title={`Select ${b.storeName} ID (password required to enter)`}
                   >
                     <span>{b.storeName}</span>
                     <span className="text-[10px] text-zinc-400 font-mono">

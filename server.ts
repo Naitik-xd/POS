@@ -11,13 +11,18 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "5mb" }));
 
+// Helper to retrieve Gemini API key (supports Vercel secret GAPI_POS and fallback GEMINI_API_KEY)
+function getGeminiApiKey(): string | undefined {
+  return process.env.GAPI_POS || process.env.GEMINI_API_KEY;
+}
+
 // Lazy initialize Gemini API client with required User-Agent
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is missing.");
+      throw new Error("GAPI_POS or GEMINI_API_KEY environment variable is missing.");
     }
     aiClient = new GoogleGenAI({
       apiKey,
@@ -37,7 +42,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
     status: "ok",
     environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString(),
-    geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    geminiConfigured: Boolean(getGeminiApiKey()),
   });
 });
 
@@ -149,8 +154,8 @@ app.post("/api/gemini/chat", async (req: Request, res: Response) => {
   const lastUserMsg = (messages || []).filter((m: any) => m.role === 'user').pop()?.content || '';
 
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY not configured in environment");
+    if (!getGeminiApiKey()) {
+      throw new Error("GAPI_POS or GEMINI_API_KEY not configured in environment");
     }
 
     const ai = getGeminiClient();

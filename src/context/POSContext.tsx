@@ -275,6 +275,7 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         products: INITIAL_PRODUCTS,
         staff: INITIAL_STAFF,
+        sales: INITIAL_TRANSACTIONS,
         createdAt: new Date().toISOString(),
       },
     ];
@@ -283,6 +284,34 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('freshmart_registered_businesses', JSON.stringify(registeredBusinesses));
   }, [registeredBusinesses]);
+
+  // Keep registered business record strictly synced with active store so switching stores never conflicts or loses data
+  useEffect(() => {
+    if (!settings.businessId || settings.businessId === 'demo_freshmart') return;
+    setRegisteredBusinesses((prev) => {
+      const idx = prev.findIndex((b) => b.businessId.toLowerCase() === settings.businessId?.toLowerCase());
+      if (idx === -1) return prev;
+      const current = prev[idx];
+      if (
+        current.products === products &&
+        current.sales === sales &&
+        current.staff === staffList &&
+        current.settings === settings
+      ) {
+        return prev;
+      }
+      const updated = [...prev];
+      updated[idx] = {
+        ...current,
+        storeName: settings.storeName || current.storeName,
+        settings,
+        products,
+        staff: staffList,
+        sales,
+      };
+      return updated;
+    });
+  }, [products, sales, staffList, settings]);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -735,20 +764,32 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newSettings: StoreSettings = {
         ...INITIAL_SETTINGS,
         ...data.settings,
-        storeName: data.settings.storeName || 'My Grocery Store',
+        storeName: data.settings.storeName?.trim() || 'My Grocery Store',
         businessId: cleanBizId,
-        adminPassword: data.adminPassword,
+        adminPassword: data.adminPassword.trim(),
         isOnboarded: true,
         isDemoMode: false,
       };
 
+      const ownerAdmin: User = {
+        id: `admin-${cleanBizId}`,
+        name: `${newSettings.storeName} Admin`,
+        email: data.settings.email?.trim() || `${cleanBizId}@store.local`,
+        role: 'manager',
+        pin: data.adminPassword.trim().slice(0, 4) || '9999',
+      };
+
+      const finalStaff = data.staff && data.staff.length > 0 ? data.staff : [ownerAdmin];
+      const finalProducts = data.products || [];
+
       const newBusinessRecord: RegisteredBusiness = {
         businessId: cleanBizId,
         storeName: newSettings.storeName,
-        adminPassword: data.adminPassword,
+        adminPassword: data.adminPassword.trim(),
         settings: newSettings,
-        products: data.products,
-        staff: data.staff,
+        products: finalProducts,
+        staff: finalStaff,
+        sales: [],
         createdAt: new Date().toISOString(),
       };
 
@@ -757,16 +798,14 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return [newBusinessRecord, ...filtered];
       });
 
+      // Isolate store completely: No demo inventory, no demo sales, no cart pollution
       setSettings(newSettings);
-      if (data.products && data.products.length > 0) {
-        setProducts(data.products);
-      }
-      if (data.staff && data.staff.length > 0) {
-        setStaffList(data.staff);
-        const managerUser =
-          data.staff.find((s) => s.role === 'manager' || s.role === 'admin') || data.staff[0];
-        setCurrentUser(managerUser);
-      }
+      setProducts(finalProducts);
+      setStaffList(finalStaff);
+      setCurrentUser(finalStaff[0]);
+      setSales([]);
+      setCart([]);
+      setHeldCarts([]);
 
       setActiveTab('billing');
       playTone('success');
@@ -784,50 +823,67 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleanId = businessId.trim().toLowerCase();
       const cleanPass = pass.trim();
 
-      // Check if it's the demo account
-      if (cleanId === 'demo_freshmart' && (cleanPass === 'demo1234' || cleanPass === 'demo')) {
-        loadDemoStore();
-        return true;
+      if (!cleanId || !cleanPass) {
+        showToast('Authentication Required', 'Please enter both Business ID and Admin Password.', 'warning');
+        return false;
       }
 
-      // Check active store
-      if (
-        settings.businessId &&
-        settings.businessId.toLowerCase() === cleanId &&
-        settings.adminPassword === cleanPass
-      ) {
-        setSettings((prev) => ({ ...prev, isOnboarded: true }));
-        setActiveTab('billing');
-        showToast('Business Login Verified', `Welcome back to ${settings.storeName}!`, 'success');
-        return true;
+      // Check if it's the demo account
+      if (cleanId === 'demo_freshmart') {
+        if (cleanPass === 'demo1234' || cleanPass === 'demo') {
+          loadDemoStore();
+          return true;
+        } else {
+          showToast('Authentication Failed', 'Incorrect password for Demo Store. (Use demo1234)', 'error');
+          return false;
+        }
       }
 
       // Check registered businesses
       const match = registeredBusinesses.find(
-        (b) => b.businessId.toLowerCase() === cleanId && b.adminPassword === cleanPass
+        (b) => b.businessId.toLowerCase() === cleanId
       );
 
-      if (match) {
-        setSettings({ ...match.settings, isOnboarded: true });
-        if (match.products && match.products.length > 0) {
-          setProducts(match.products);
-        }
-        if (match.staff && match.staff.length > 0) {
-          setStaffList(match.staff);
-          const mgr =
-            match.staff.find((s) => s.role === 'manager' || s.role === 'admin') || match.staff[0];
-          setCurrentUser(mgr);
-        }
-        setActiveTab('billing');
-        playTone('success');
-        showToast('Business Login Verified', `Welcome back to ${match.storeName}!`, 'success');
-        return true;
+      if (!match) {
+        showToast(
+          'Business Not Found',
+          `No registered business found for "${cleanId}". Only authorized users with registered ID and password can enter.`,
+          'error'
+        );
+        return false;
       }
 
-      showToast('Authentication Failed', 'Incorrect Business ID or Password. Please try again.', 'error');
-      return false;
+      if (match.adminPassword !== cleanPass) {
+        showToast('Access Denied', 'Incorrect password for this Business ID. Entry rejected.', 'error');
+        return false;
+      }
+
+      // Strictly isolated authentication: load only this business's products, staff, and sales
+      const ownerAdmin: User = {
+        id: `admin-${match.businessId}`,
+        name: `${match.storeName} Admin`,
+        email: `${match.businessId}@store.local`,
+        role: 'manager',
+        pin: match.adminPassword.slice(0, 4) || '9999',
+      };
+      const validStaff = match.staff && match.staff.length > 0 ? match.staff : [ownerAdmin];
+      const activeManager =
+        validStaff.find((s) => s.role === 'manager' || s.role === 'admin') || validStaff[0];
+
+      setSettings({ ...match.settings, isOnboarded: true, isDemoMode: false });
+      setProducts(match.products || []);
+      setStaffList(validStaff);
+      setCurrentUser(activeManager);
+      setSales(match.sales || []);
+      setCart([]);
+      setHeldCarts([]);
+
+      setActiveTab('billing');
+      playTone('success');
+      showToast('Business Login Verified', `Welcome back to ${match.storeName}!`, 'success');
+      return true;
     },
-    [loadDemoStore, registeredBusinesses, settings, showToast]
+    [loadDemoStore, registeredBusinesses, showToast]
   );
 
   const clearAllAlerts = useCallback(() => {

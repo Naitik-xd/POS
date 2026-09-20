@@ -46,71 +46,49 @@ export const WelcomePage: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Business ID and Admin Password for registration
-  const [businessIdInput, setBusinessIdInput] = useState(
-    settings.businessId && settings.businessId !== 'demo_freshmart' ? settings.businessId : ''
-  );
-  const [adminPasswordInput, setAdminPasswordInput] = useState(
-    settings.adminPassword && settings.businessId !== 'demo_freshmart' ? settings.adminPassword : ''
-  );
+  // Business ID and Admin Password for registration - completely empty by default
+  const [businessIdInput, setBusinessIdInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
 
-  // Onboarding Temporary State
+  // Onboarding Temporary State - all entry fields empty by default
   const [storeForm, setStoreForm] = useState<Partial<StoreSettings>>({
-    storeName: settings.storeName || 'My Neighborhood Grocery',
-    tagline: settings.tagline || 'Fresh Produce, Pantry & Daily Essentials',
-    address: settings.address || '123 Main Street, Suite A',
-    phone: settings.phone || '(555) 234-5678',
-    email: settings.email || 'contact@mygrocerystore.com',
-    taxNumber: settings.taxNumber || 'TAX-998811',
-    defaultTaxRate: settings.defaultTaxRate || 5.0,
-    receiptFooterMessage:
-      settings.receiptFooterMessage || 'Thank you for shopping with us! Have a wonderful day.',
-    customReceiptHeader: settings.customReceiptHeader || '',
+    storeName: '',
+    tagline: '',
+    address: '',
+    phone: '',
+    email: '',
+    taxNumber: '',
+    defaultTaxRate: 0,
+    receiptFooterMessage: '',
+    customReceiptHeader: '',
   });
 
-  // Onboarding Inventory State
-  const [inventoryItems, setInventoryItems] = useState<Product[]>(() => {
-    return products.slice(0, 10);
-  });
+  // Onboarding Inventory State - starts completely empty (0 items)
+  const [inventoryItems, setInventoryItems] = useState<Product[]>([]);
 
   const [newItem, setNewItem] = useState<{
     name: string;
     category: ProductCategory;
-    price: number;
-    costPrice: number;
-    stockQuantity: number;
-    lowStockThreshold: number;
+    price: string;
+    costPrice: string;
+    stockQuantity: string;
+    lowStockThreshold: string;
     barcode: string;
     unit: 'pcs' | 'kg' | 'lb' | 'pack' | 'liter' | 'bunch';
   }>({
     name: '',
     category: 'Produce',
-    price: 2.49,
-    costPrice: 1.2,
-    stockQuantity: 30,
-    lowStockThreshold: 10,
-    barcode: `${Math.floor(8900000 + Math.random() * 99999)}`,
+    price: '',
+    costPrice: '',
+    stockQuantity: '',
+    lowStockThreshold: '',
+    barcode: '',
     unit: 'pcs',
   });
 
-  // Onboarding Staff State
-  const [staffAccounts, setStaffAccounts] = useState<User[]>([
-    {
-      id: 'admin-1',
-      name: 'Alex Store Owner',
-      email: 'owner@grocery.local',
-      role: 'manager',
-      pin: '1234',
-    },
-    {
-      id: 'cashier-1',
-      name: 'Jordan Cashier',
-      email: 'jordan@grocery.local',
-      role: 'cashier',
-      pin: '2222',
-    },
-  ]);
+  // Onboarding Staff State - starts completely empty (0 predefined staff)
+  const [staffAccounts, setStaffAccounts] = useState<User[]>([]);
 
   const [newStaffMember, setNewStaffMember] = useState<{
     name: string;
@@ -121,7 +99,7 @@ export const WelcomePage: React.FC = () => {
     name: '',
     email: '',
     role: 'cashier',
-    pin: '5555',
+    pin: '',
   });
 
   // Categories list
@@ -136,22 +114,67 @@ export const WelcomePage: React.FC = () => {
     'Household & Personal',
   ];
 
+  // Helper to reset onboarding form so every entry field is fresh and empty
+  const resetOnboardingForm = () => {
+    setBusinessIdInput('');
+    setAdminPasswordInput('');
+    setShowRegPassword(false);
+    setStoreForm({
+      storeName: '',
+      tagline: '',
+      address: '',
+      phone: '',
+      email: '',
+      taxNumber: '',
+      defaultTaxRate: 0,
+      receiptFooterMessage: '',
+      customReceiptHeader: '',
+    });
+    setInventoryItems([]);
+    setNewItem({
+      name: '',
+      category: 'Produce',
+      price: '',
+      costPrice: '',
+      stockQuantity: '',
+      lowStockThreshold: '',
+      barcode: '',
+      unit: 'pcs',
+    });
+    setStaffAccounts([]);
+    setNewStaffMember({
+      name: '',
+      email: '',
+      role: 'cashier',
+      pin: '',
+    });
+    setOnboardingStep(1);
+  };
+
   // Helper to add custom inventory item in onboarding
   const handleAddInventoryItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.name.trim()) return;
+    if (!newItem.name.trim()) {
+      showToast('Item Name Required', 'Please enter a product name.', 'warning');
+      return;
+    }
+
+    const priceNum = parseFloat(newItem.price) || 0;
+    const costNum = parseFloat(newItem.costPrice) || 0;
+    const stockNum = parseInt(newItem.stockQuantity, 10) || 0;
+    const lowNum = parseInt(newItem.lowStockThreshold, 10) || 5;
 
     const created: Product = {
       id: `prod-onboard-${Date.now()}`,
       name: newItem.name.trim(),
       category: newItem.category,
-      price: newItem.price,
-      costPrice: newItem.costPrice,
-      stockQuantity: newItem.stockQuantity,
-      lowStockThreshold: newItem.lowStockThreshold,
-      barcode: newItem.barcode || `${Math.floor(8900000 + Math.random() * 99999)}`,
+      price: priceNum,
+      costPrice: costNum,
+      stockQuantity: stockNum,
+      lowStockThreshold: lowNum,
+      barcode: newItem.barcode.trim() || `${Math.floor(8900000 + Math.random() * 99999)}`,
       unit: newItem.unit,
-      taxRate: storeForm.defaultTaxRate || 5,
+      taxRate: storeForm.defaultTaxRate || 0,
       isActive: true,
       salesCount: 0,
     };
@@ -160,11 +183,11 @@ export const WelcomePage: React.FC = () => {
     setNewItem({
       name: '',
       category: 'Produce',
-      price: 2.49,
-      costPrice: 1.2,
-      stockQuantity: 30,
-      lowStockThreshold: 10,
-      barcode: `${Math.floor(8900000 + Math.random() * 99999)}`,
+      price: '',
+      costPrice: '',
+      stockQuantity: '',
+      lowStockThreshold: '',
+      barcode: '',
       unit: 'pcs',
     });
     showToast('Product Added', `${created.name} added to opening inventory.`, 'success');
@@ -173,14 +196,21 @@ export const WelcomePage: React.FC = () => {
   // Helper to add staff account in onboarding
   const handleAddStaff = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaffMember.name.trim()) return;
+    if (!newStaffMember.name.trim()) {
+      showToast('Name Required', 'Please enter an employee name.', 'warning');
+      return;
+    }
+    if (!newStaffMember.pin.trim() || newStaffMember.pin.trim().length !== 4) {
+      showToast('4-Digit PIN Required', 'Please enter a 4-digit security PIN for this staff member.', 'warning');
+      return;
+    }
 
     const created: User = {
       id: `staff-onboard-${Date.now()}`,
       name: newStaffMember.name.trim(),
-      email: newStaffMember.email || `${newStaffMember.name.toLowerCase().replace(/\s+/g, '.')}@store.local`,
+      email: newStaffMember.email.trim() || `${newStaffMember.name.toLowerCase().replace(/\s+/g, '.')}@store.local`,
       role: newStaffMember.role,
-      pin: newStaffMember.pin || '1111',
+      pin: newStaffMember.pin.trim(),
     };
 
     setStaffAccounts((prev) => [...prev, created]);
@@ -188,36 +218,57 @@ export const WelcomePage: React.FC = () => {
       name: '',
       email: '',
       role: 'cashier',
-      pin: '5555',
+      pin: '',
     });
     showToast('Staff Added', `${created.name} assigned as ${created.role.toUpperCase()}.`, 'success');
   };
 
   // Final submit: Save store and launch terminal
   const handleCompleteOnboarding = () => {
-    if (!businessIdInput.trim()) {
+    const cleanBizId = businessIdInput.trim().toLowerCase();
+    const cleanPass = adminPasswordInput.trim();
+    const storeName = storeForm.storeName?.trim();
+
+    if (!cleanBizId) {
       setOnboardingStep(1);
       showToast('Business ID Required', 'Please provide a Business ID / username in Step 1.', 'warning');
       return;
     }
-    if (!adminPasswordInput.trim() || adminPasswordInput.trim().length < 4) {
+    if (!cleanPass || cleanPass.length < 4) {
       setOnboardingStep(1);
       showToast('Password Required', 'Please provide an admin password (min 4 chars) in Step 1.', 'warning');
       return;
     }
+    if (!storeName) {
+      setOnboardingStep(1);
+      showToast('Store Name Required', 'Please provide your store name in Step 1.', 'warning');
+      return;
+    }
+
+    // If no extra staff accounts were manually added, auto-create the Owner's Admin account
+    const ownerAdmin: User = {
+      id: `admin-${cleanBizId}`,
+      name: `${storeName} Admin`,
+      email: storeForm.email?.trim() || `${cleanBizId}@store.local`,
+      role: 'manager',
+      pin: cleanPass.slice(0, 4) || '9999',
+    };
+
+    const finalStaff = staffAccounts.length > 0 ? staffAccounts : [ownerAdmin];
 
     registerBusiness({
-      businessId: businessIdInput.trim(),
-      adminPassword: adminPasswordInput.trim(),
+      businessId: cleanBizId,
+      adminPassword: cleanPass,
       settings: {
         ...storeForm,
-        businessId: businessIdInput.trim(),
-        adminPassword: adminPasswordInput.trim(),
+        storeName,
+        businessId: cleanBizId,
+        adminPassword: cleanPass,
         isOnboarded: true,
         isDemoMode: false,
       },
       products: inventoryItems,
-      staff: staffAccounts,
+      staff: finalStaff,
     });
     setIsOnboardingOpen(false);
   };
@@ -242,7 +293,7 @@ export const WelcomePage: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                setOnboardingStep(1);
+                resetOnboardingForm();
                 setIsOnboardingOpen(true);
               }}
               className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-amber-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs transition"
@@ -274,7 +325,7 @@ export const WelcomePage: React.FC = () => {
           <button
             id="btn-add-your-business"
             onClick={() => {
-              setOnboardingStep(1);
+              resetOnboardingForm();
               setIsOnboardingOpen(true);
             }}
             className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition"
@@ -435,7 +486,7 @@ export const WelcomePage: React.FC = () => {
 
         <button
           onClick={() => {
-            setOnboardingStep(1);
+            resetOnboardingForm();
             setIsOnboardingOpen(true);
           }}
           className="px-4 py-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
@@ -750,14 +801,15 @@ export const WelcomePage: React.FC = () => {
 
                       <div>
                         <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
-                          Selling Price ($)
+                          Selling Price ($) *
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           required
+                          placeholder="0.00"
                           value={newItem.price}
-                          onChange={(e) => setNewItem({ ...newItem, price: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
                           className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-white"
                         />
                       </div>
@@ -766,10 +818,11 @@ export const WelcomePage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
-                          Barcode
+                          Barcode (Optional)
                         </label>
                         <input
                           type="text"
+                          placeholder="e.g. 89012345"
                           value={newItem.barcode}
                           onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
                           className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white"
@@ -782,8 +835,9 @@ export const WelcomePage: React.FC = () => {
                         </label>
                         <input
                           type="number"
+                          placeholder="0"
                           value={newItem.stockQuantity}
-                          onChange={(e) => setNewItem({ ...newItem, stockQuantity: parseInt(e.target.value, 10) || 0 })}
+                          onChange={(e) => setNewItem({ ...newItem, stockQuantity: e.target.value })}
                           className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white"
                         />
                       </div>
@@ -805,47 +859,61 @@ export const WelcomePage: React.FC = () => {
                       <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                         Opening Catalog Items ({inventoryItems.length})
                       </span>
-                      <span className="text-[11px] text-zinc-400">Favicon badges applied</span>
+                      <span className="text-[11px] text-zinc-400">
+                        {inventoryItems.length === 0 ? 'No pre-loaded items' : 'Favicon badges applied'}
+                      </span>
                     </div>
 
-                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                      {inventoryItems.map((item) => {
-                        const badge = getCategoryBadgeStyle(item.category);
-                        return (
-                          <div
-                            key={item.id}
-                            className="p-3 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-xs"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${badge.bg} ${badge.text} ${badge.border}`}>
-                                {getCategoryIcon(item.category, 'w-4 h-4')}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-zinc-900 dark:text-white">
-                                  {item.name}
+                    {inventoryItems.length === 0 ? (
+                      <div className="p-8 text-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2">
+                        <Boxes className="w-8 h-8 text-zinc-400 mx-auto" />
+                        <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                          No Inventory Pre-loaded (Zero Default Items)
+                        </p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
+                          Opening catalog starts 100% empty. Add your own products above, or scan & import items anytime after launching the terminal.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        {inventoryItems.map((item) => {
+                          const badge = getCategoryBadgeStyle(item.category);
+                          return (
+                            <div
+                              key={item.id}
+                              className="p-3 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-xs"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                  {getCategoryIcon(item.category, 'w-4 h-4')}
                                 </div>
-                                <div className="text-[11px] text-zinc-500 font-mono">
-                                  Barcode: {item.barcode} • {item.stockQuantity} {item.unit} in stock
+                                <div>
+                                  <div className="font-semibold text-zinc-900 dark:text-white">
+                                    {item.name}
+                                  </div>
+                                  <div className="text-[11px] text-zinc-500 font-mono">
+                                    Barcode: {item.barcode} • {item.stockQuantity} {item.unit} in stock
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="flex items-center space-x-3">
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                ${item.price.toFixed(2)}
-                              </span>
-                              <button
-                                onClick={() => setInventoryItems((prev) => prev.filter((p) => p.id !== item.id))}
-                                className="p-1 text-zinc-400 hover:text-rose-600 rounded transition"
-                                title="Remove Item"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center space-x-3">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  ${item.price.toFixed(2)}
+                                </span>
+                                <button
+                                  onClick={() => setInventoryItems((prev) => prev.filter((p) => p.id !== item.id))}
+                                  className="p-1 text-zinc-400 hover:text-rose-600 rounded transition"
+                                  title="Remove Item"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -917,11 +985,12 @@ export const WelcomePage: React.FC = () => {
 
                       <div>
                         <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
-                          4-Digit PIN
+                          4-Digit PIN *
                         </label>
                         <input
                           type="password"
                           maxLength={4}
+                          placeholder="••••"
                           value={newStaffMember.pin}
                           onChange={(e) => setNewStaffMember({ ...newStaffMember, pin: e.target.value })}
                           className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white"
@@ -944,30 +1013,41 @@ export const WelcomePage: React.FC = () => {
                     <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                       Store Staff Accounts ({staffAccounts.length})
                     </div>
-                    <div className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                      {staffAccounts.map((s) => (
-                        <div key={s.id} className="p-3 flex items-center justify-between text-xs">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-[11px] ${
-                              s.role === 'manager' ? 'bg-purple-600' : 'bg-emerald-600'
-                            }`}>
-                              {s.name[0]}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-zinc-900 dark:text-white">{s.name}</div>
-                              <div className="text-[11px] text-zinc-400 font-mono">PIN: •••• ({s.email})</div>
-                            </div>
-                          </div>
 
-                          <div className="flex items-center space-x-3">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              s.role === 'manager'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            }`}>
-                              {s.role}
-                            </span>
-                            {staffAccounts.length > 1 && (
+                    {staffAccounts.length === 0 ? (
+                      <div className="p-8 text-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-2">
+                        <Users className="w-8 h-8 text-zinc-400 mx-auto" />
+                        <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                          No Pre-defined Employees (Clean State)
+                        </p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
+                          No employees pre-populated. Your Store Owner Admin account will be generated automatically from your Step 1 Store Name & Admin Password. You can add extra cashier/manager staff above or at any time in the Employees tab.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        {staffAccounts.map((s) => (
+                          <div key={s.id} className="p-3 flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-[11px] ${
+                                s.role === 'manager' ? 'bg-purple-600' : 'bg-emerald-600'
+                              }`}>
+                                {s.name[0]}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-zinc-900 dark:text-white">{s.name}</div>
+                                <div className="text-[11px] text-zinc-400 font-mono">PIN: •••• ({s.email})</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                s.role === 'manager'
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              }`}>
+                                {s.role}
+                              </span>
                               <button
                                 onClick={() => setStaffAccounts((prev) => prev.filter((u) => u.id !== s.id))}
                                 className="text-zinc-400 hover:text-rose-600 p-1"
@@ -975,11 +1055,11 @@ export const WelcomePage: React.FC = () => {
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1018,11 +1098,15 @@ export const WelcomePage: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">Catalog SKUs:</span>
-                      <span className="font-bold text-zinc-900 dark:text-white">{inventoryItems.length} Products</span>
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {inventoryItems.length > 0 ? `${inventoryItems.length} Products` : '0 Products (Clean Start)'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">Staff Members:</span>
-                      <span className="font-bold text-zinc-900 dark:text-white">{staffAccounts.length} Employees</span>
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {staffAccounts.length > 0 ? `${staffAccounts.length} Employees` : '1 Administrator (Auto-created)'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">Receipt Customization:</span>
@@ -1103,7 +1187,7 @@ export const WelcomePage: React.FC = () => {
         onClose={() => setIsLoginModalOpen(false)}
         onSwitchToRegister={() => {
           setIsLoginModalOpen(false);
-          setOnboardingStep(1);
+          resetOnboardingForm();
           setIsOnboardingOpen(true);
         }}
       />
