@@ -9,7 +9,6 @@ import { LegalPage } from './components/LegalPage';
 import { WelcomePage } from './components/WelcomePage';
 import { AuthModal } from './components/AuthModal';
 import { AutomatedAlertsDrawer } from './components/AutomatedAlertsDrawer';
-import { SupabaseModal } from './components/SupabaseModal';
 import { BottomNavbar } from './components/BottomNavbar';
 import {
   CheckCircle2,
@@ -25,12 +24,11 @@ const POSAppContent: React.FC = () => {
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200 overflow-x-hidden">
       {/* Main Viewport Content based on active tab with bottom spacing for BottomNavbar */}
-      <main className="flex-1 pb-24 sm:pb-28 overflow-x-hidden">
+      <main className={`flex-1 ${activeTab === 'gemini' || activeTab === 'ai_insights' ? 'pb-16 sm:pb-20' : 'pb-24 sm:pb-28'} overflow-x-hidden flex flex-col`}>
         {activeTab === 'welcome' && <WelcomePage />}
         {activeTab === 'billing' && <BillingDashboard />}
         {activeTab === 'inventory' && <InventoryDashboard />}
@@ -42,36 +40,37 @@ const POSAppContent: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 py-6 px-4 sm:px-6 lg:px-8 text-xs text-zinc-500 mb-14 sm:mb-16">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <Store className="w-4 h-4 text-emerald-600" />
-            <span className="font-bold text-zinc-700 dark:text-zinc-300">
-              {settings.storeName} Point of Sale
-            </span>
-            <span>•</span>
-            <span>Enterprise Grocery Edition</span>
-          </div>
+      {/* Footer (Hidden on AI Chat to maximize viewport space and prevent half-screen cropping) */}
+      {activeTab !== 'gemini' && activeTab !== 'ai_insights' && (
+        <footer className="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 py-6 px-4 sm:px-6 lg:px-8 text-xs text-zinc-500 mb-14 sm:mb-16">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center space-x-2">
+              <Store className="w-4 h-4 text-emerald-600" />
+              <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                {settings.storeName} Point of Sale
+              </span>
+              <span>•</span>
+              <span>Enterprise Grocery Edition</span>
+            </div>
 
-          <div className="flex items-center space-x-4 text-xs">
-            <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-              <span>Terminal Online</span>
-            </span>
-            <span>•</span>
-            <span>Version 2.4.0</span>
-            <span>•</span>
-            <span>© {new Date().getFullYear()} {settings.storeName}. All rights reserved.</span>
+            <div className="flex items-center space-x-4 text-xs">
+              <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                <span>Terminal Online</span>
+              </span>
+              <span>•</span>
+              <span>Version 2.4.0</span>
+              <span>•</span>
+              <span>© {new Date().getFullYear()} {settings.storeName}. All rights reserved.</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Primary Fixed Bottom Navigation Bar */}
       <BottomNavbar
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
-        onOpenSupabase={() => setIsSupabaseModalOpen(true)}
       />
 
       {/* Modals & Drawers */}
@@ -80,7 +79,6 @@ const POSAppContent: React.FC = () => {
         isOpen={isAlertsDrawerOpen}
         onClose={() => setIsAlertsDrawerOpen(false)}
       />
-      <SupabaseModal isOpen={isSupabaseModalOpen} onClose={() => setIsSupabaseModalOpen(false)} />
 
       {/* Global Interactive Toast Notification Stack (raised above bottom navbar) */}
       {toasts.length > 0 && (

@@ -12,7 +12,6 @@ import {
   Sun,
   Moon,
   Bell,
-  Database,
   MoreHorizontal,
   X,
   Info,
@@ -20,19 +19,17 @@ import {
   Building2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
-import { ActiveTab } from '../types';
-import { isSupabaseConfigured } from '../services/supabaseService';
+import { ActiveTab, UserRole } from '../types';
+import { RoleSwitchPinModal } from './RoleSwitchPinModal';
 
 interface BottomNavbarProps {
   onOpenAuth: () => void;
   onOpenAlerts: () => void;
-  onOpenSupabase: () => void;
 }
 
 export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   onOpenAuth,
   onOpenAlerts,
-  onOpenSupabase,
 }) => {
   const {
     activeTab,
@@ -48,7 +45,13 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   } = usePOS();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const supabaseConnected = isSupabaseConfigured();
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [targetRole, setTargetRole] = useState<UserRole>('manager');
+
+  const handleInitiateRoleSwitch = (role: UserRole) => {
+    setTargetRole(role);
+    setIsPinModalOpen(true);
+  };
 
   const lowStockCount = alerts.filter(
     (a) => a.type === 'low_stock' || a.type === 'out_of_stock'
@@ -210,26 +213,6 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 )}
               </button>
 
-              {/* Supabase Cloud Sync Status Button */}
-              <button
-                id="bottom-bar-supabase-btn"
-                type="button"
-                onClick={onOpenSupabase}
-                title={
-                  supabaseConnected
-                    ? 'Supabase Cloud Database Connected'
-                    : 'Configure Supabase Cloud Database'
-                }
-                className="relative p-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-              >
-                <Database className="w-4 h-4" />
-                <span
-                  className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white dark:ring-zinc-900 ${
-                    supabaseConnected ? 'bg-emerald-500' : 'bg-amber-400'
-                  }`}
-                />
-              </button>
-
               {/* Light / Dark Mode Toggle */}
               <button
                 id="bottom-bar-theme-btn"
@@ -263,14 +246,14 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 </button>
               )}
 
-              {/* Quick 1-Click Role Toggle */}
+              {/* Quick Role Switch (Protected by PIN) */}
               <button
                 id="bottom-bar-role-toggle"
                 type="button"
                 onClick={() =>
-                  switchRole(currentUser.role === 'manager' ? 'cashier' : 'manager')
+                  handleInitiateRoleSwitch(currentUser.role === 'manager' ? 'cashier' : 'manager')
                 }
-                title={`Click to switch role. Current: ${currentUser.role.toUpperCase()}`}
+                title={`Click to switch role (Requires PIN). Current: ${currentUser.role.toUpperCase()}`}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center space-x-1.5 ${
                   currentUser.role === 'manager'
                     ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300'
@@ -333,12 +316,12 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
             {/* Quick Actions Grid */}
             <div className="p-4 space-y-3 overflow-y-auto">
               <div className="grid grid-cols-2 gap-2.5">
-                {/* 1-Click Role Switch */}
+                {/* Role Switch (PIN Protected) */}
                 <button
                   type="button"
                   onClick={() => {
-                    switchRole(currentUser.role === 'manager' ? 'cashier' : 'manager');
                     setMobileMenuOpen(false);
+                    handleInitiateRoleSwitch(currentUser.role === 'manager' ? 'cashier' : 'manager');
                   }}
                   className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition ${
                     currentUser.role === 'manager'
@@ -358,7 +341,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                   </div>
                   <div className="mt-2">
                     <p className="text-xs font-bold capitalize">{currentUser.role} Mode</p>
-                    <p className="text-[10px] opacity-75">Tap to switch role</p>
+                    <p className="text-[10px] opacity-75">Tap to switch (PIN)</p>
                   </div>
                 </button>
 
@@ -397,28 +380,21 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                   </div>
                 </button>
 
-                {/* Supabase Cloud Sync */}
+                {/* Quick Demo Store Action */}
                 <button
                   type="button"
                   onClick={() => {
+                    loadDemoStore();
                     setMobileMenuOpen(false);
-                    onOpenSupabase();
                   }}
                   className="p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left flex flex-col justify-between transition"
                 >
-                  <div className="flex items-center justify-between">
-                    <Database className="w-5 h-5 text-emerald-600" />
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        supabaseConnected ? 'bg-emerald-500' : 'bg-amber-400'
-                      }`}
-                    />
-                  </div>
+                  <Play className="w-5 h-5 text-amber-500 fill-amber-500" />
                   <div className="mt-2">
-                    <p className="text-xs font-bold text-zinc-900 dark:text-white">Supabase Cloud</p>
-                    <p className="text-[10px] text-zinc-500">
-                      {supabaseConnected ? 'Connected' : 'Configure DB'}
+                    <p className="text-xs font-bold text-zinc-900 dark:text-white">
+                      {settings.isDemoMode ? 'Demo Active' : 'Load Demo'}
                     </p>
+                    <p className="text-[10px] text-zinc-500">Sample grocery data</p>
                   </div>
                 </button>
               </div>
@@ -497,6 +473,14 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
           </div>
         </div>
       )}
+
+      {/* Security PIN Verification Modal for Switching Roles */}
+      <RoleSwitchPinModal
+        isOpen={isPinModalOpen}
+        targetRole={targetRole}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={() => setIsPinModalOpen(false)}
+      />
     </>
   );
 };

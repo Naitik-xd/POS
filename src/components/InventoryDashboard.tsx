@@ -21,6 +21,7 @@ import {
 import { usePOS } from '../context/POSContext';
 import { Product, ProductCategory } from '../types';
 import { getCategoryIcon, getCategoryBadgeStyle } from '../utils/categoryIcons';
+import { RoleSwitchPinModal } from './RoleSwitchPinModal';
 
 export const InventoryDashboard: React.FC = () => {
   const {
@@ -34,6 +35,9 @@ export const InventoryDashboard: React.FC = () => {
     switchRole,
     showToast,
   } = usePOS();
+
+  // Role PIN Switch Modal
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -227,10 +231,10 @@ export const InventoryDashboard: React.FC = () => {
             </span>
           </div>
           <button
-            onClick={() => switchRole('manager')}
+            onClick={() => setIsPinModalOpen(true)}
             className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 dark:bg-amber-800 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 font-bold text-xs whitespace-nowrap transition"
           >
-            Switch to Manager
+            Switch to Manager (PIN)
           </button>
         </div>
       )}
@@ -804,6 +808,14 @@ export const InventoryDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Role PIN Switch Modal */}
+      <RoleSwitchPinModal
+        isOpen={isPinModalOpen}
+        targetRole="manager"
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={() => setIsPinModalOpen(false)}
+      />
     </div>
   );
 };

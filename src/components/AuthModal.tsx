@@ -77,8 +77,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleQuickRoleSwitch = (role: UserRole) => {
-    switchRole(role);
-    onClose();
+    setMode('pin');
+    setPinInput('');
+    if (role === 'manager') {
+      showToast('Manager PIN Required', 'Enter 4-digit Manager PIN (Demo: 9999) to unlock.', 'info');
+    } else {
+      showToast('Cashier PIN Required', 'Enter 4-digit Cashier PIN (Demo: 1234) to switch.', 'info');
+    }
   };
 
   return (

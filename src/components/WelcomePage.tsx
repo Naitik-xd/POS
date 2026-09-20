@@ -316,6 +316,21 @@ export const WelcomePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Hack Devengers 2.0 Hackathon Disclaimer Notice */}
+      <div
+        id="hackathon-disclaimer-banner"
+        className="max-w-3xl mx-auto w-full p-4 sm:p-5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border-2 border-dashed border-amber-400 dark:border-amber-600/60 text-amber-900 dark:text-amber-200 text-center shadow-xs"
+      >
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-amber-500 text-white font-black text-xs shrink-0 shadow-2xs">
+            ⚠️
+          </span>
+          <p className="text-xs sm:text-sm font-semibold tracking-normal leading-relaxed">
+            This web is completely made for <strong className="font-extrabold underline decoration-amber-500 underline-offset-2">Hack Devengers 2.0</strong> hackathon and is not applicable for actual use.
+          </p>
+        </div>
+      </div>
+
       {/* About Us & Why Choose Us Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
         {/* About Us Card */}

@@ -29,6 +29,7 @@ import {
 import { usePOS } from '../context/POSContext';
 import { SaleTransaction, UserRole } from '../types';
 import { downloadReceiptPdf } from '../utils/receiptPdf';
+import { RoleSwitchPinModal } from './RoleSwitchPinModal';
 
 export const SalesDashboard: React.FC = () => {
   const {
@@ -48,6 +49,10 @@ export const SalesDashboard: React.FC = () => {
     archiveReceiptPdf,
     showToast,
   } = usePOS();
+
+  // Role PIN modal
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [targetRole, setTargetRole] = useState<UserRole>('manager');
 
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'receipts' | 'employees'>('analytics');
   const [timeRange, setTimeRange] = useState<'today' | '7days' | 'month' | 'all'>('today');
@@ -204,7 +209,10 @@ export const SalesDashboard: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             id="btn-switch-role-sales-panel"
-            onClick={() => switchRole(isManager ? 'cashier' : 'manager')}
+            onClick={() => {
+              setTargetRole(isManager ? 'cashier' : 'manager');
+              setIsPinModalOpen(true);
+            }}
             className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 ${
               isManager
                 ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/70 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300'
@@ -212,7 +220,7 @@ export const SalesDashboard: React.FC = () => {
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Switch to {isManager ? 'Cashier Role' : 'Manager Role'}</span>
+            <span>Switch to {isManager ? 'Cashier Role (PIN)' : 'Manager Role (PIN)'}</span>
           </button>
         </div>
       </div>
@@ -228,10 +236,13 @@ export const SalesDashboard: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => switchRole('manager')}
+            onClick={() => {
+              setTargetRole('manager');
+              setIsPinModalOpen(true);
+            }}
             className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 transition"
           >
-            Switch to Manager
+            Switch to Manager (PIN)
           </button>
         </div>
       )}
@@ -742,6 +753,14 @@ export const SalesDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Role PIN Switch Modal */}
+      <RoleSwitchPinModal
+        isOpen={isPinModalOpen}
+        targetRole={targetRole}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={() => setIsPinModalOpen(false)}
+      />
     </div>
   );
 };

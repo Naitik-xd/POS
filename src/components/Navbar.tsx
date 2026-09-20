@@ -22,7 +22,6 @@ import { ActiveTab } from '../types';
 interface NavbarProps {
   onOpenAlerts: () => void;
   onOpenAuth: () => void;
-  onOpenSupabase: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth }) => {
