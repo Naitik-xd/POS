@@ -161,7 +161,17 @@ export const GeminiInsightsDashboard: React.FC = () => {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const rawResponseText = await res.text();
+      try {
+        data = JSON.parse(rawResponseText);
+      } catch {
+        throw new Error(
+          !res.ok
+            ? 'Server initialization error. Please verify that GEMINI_API_KEY is configured in your deployment settings.'
+            : 'Unable to parse server response.'
+        );
+      }
 
       // Check if security blocked or warnings returned
       if (data.security) {

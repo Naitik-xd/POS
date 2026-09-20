@@ -1,68 +1,172 @@
 import { GoogleGenAI } from '@google/genai';
-import {
-  extractClientIp,
-  validateIpRequest,
-  recordSuccessfulRequest,
-  isGibberish,
-  handleGibberishOffense,
-} from '../../src/services/aiSecurityGuard';
 
 export interface ApiRequest {
   method?: string;
   body?: any;
   query?: Record<string, string | string[] | undefined>;
   headers?: Record<string, string | string[] | undefined>;
+  socket?: { remoteAddress?: string };
+  ip?: string;
 }
 
 export interface ApiResponse {
   status: (statusCode: number) => ApiResponse;
   json: (data: any) => void;
   send: (body: any) => void;
+  setHeader?: (name: string, value: string) => void;
+}
+
+// In-memory rate limiting for serverless instance
+interface IpRecord {
+  count: number;
+  windowStart: number;
+  warnings: number;
+  bannedUntil: number | null;
+}
+const ipMap = new Map<string, IpRecord>();
+
+function getClientIp(req: ApiRequest): string {
+  const xForwardedFor = req.headers?.['x-forwarded-for'];
+  if (xForwardedFor) {
+    const ips = Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor;
+    return ips.split(',')[0].trim();
+  }
+  const realIp = req.headers?.['x-real-ip'];
+  if (realIp) {
+    return Array.isArray(realIp) ? realIp[0].trim() : realIp.trim();
+  }
+  return req.socket?.remoteAddress || req.ip || '127.0.0.1';
+}
+
+function checkGibberish(text: string): { isGibberish: boolean; reason?: string } {
+  if (!text || text.trim().length < 4) return { isGibberish: false };
+  const clean = text.trim();
+
+  // Excessive repetitive characters e.g. "aaaaaaa", "asdfasdfasdf"
+  if (/(.)\1{6,}/i.test(clean)) {
+    return { isGibberish: true, reason: 'Repeated character spam detected' };
+  }
+  if (/([a-z0-9]{2,4})\1{4,}/i.test(clean)) {
+    return { isGibberish: true, reason: 'Repetitive pattern spam detected' };
+  }
+
+  // Keyboard smash detection (long sequences of consonants)
+  const words = clean.split(/\s+/);
+  for (const w of words) {
+    if (w.length >= 14 && !/[aeiouy]/i.test(w)) {
+      return { isGibberish: true, reason: 'Random keyboard smash detected' };
+    }
+  }
+
+  return { isGibberish: false };
 }
 
 function getApiKey(): string | undefined {
-  return process.env.GAPI_POS || process.env.GEMINI_API_KEY;
+  return process.env.GEMINI_API_KEY || process.env.GAPI_POS;
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  // Always set JSON content-type
+  if (typeof res.setHeader === 'function') {
+    res.setHeader('Content-Type', 'application/json');
   }
 
-  const clientIp = extractClientIp(req);
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
 
-  // 1. Validate security, perma_ban & 15 requests in 3 hours limit
-  const securityCheck = validateIpRequest(clientIp);
-  if (!securityCheck.allowed) {
-    return res.status(securityCheck.statusCode || 429).json({
+  const clientIp = getClientIp(req);
+  const now = Date.now();
+  const THREE_HOURS = 3 * 60 * 60 * 1000;
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+  // Track IP rate limits
+  let rec = ipMap.get(clientIp);
+  if (!rec || now - rec.windowStart > THREE_HOURS) {
+    rec = { count: 0, windowStart: now, warnings: rec?.warnings || 0, bannedUntil: rec?.bannedUntil || null };
+    ipMap.set(clientIp, rec);
+  }
+
+  // Check 24-hour ban
+  if (rec.bannedUntil && now < rec.bannedUntil) {
+    return res.status(429).json({
       success: false,
-      error: securityCheck.error,
-      record: securityCheck.record,
+      error: 'Your IP is temporarily suspended due to repeated abuse. Please try again later.',
       securityBlocked: true,
     });
   }
 
-  const { messages, storeContext } = req.body || {};
+  // Check 15 requests limit
+  if (rec.count >= 15) {
+    return res.status(429).json({
+      success: false,
+      error: 'Rate limit reached: Maximum 15 requests per 3 hours. Please wait for the window to reset.',
+      securityBlocked: true,
+    });
+  }
+
+  // Parse body safely
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      body = {};
+    }
+  }
+  const { messages, storeContext } = body || {};
   const lastUserMsg = (messages || []).filter((m: any) => m.role === 'user').pop()?.content || '';
 
-  // 2. Gibberish & prompt abuse detection
+  // Check gibberish
   if (lastUserMsg) {
-    const gibberishCheck = isGibberish(lastUserMsg);
-    if (gibberishCheck.isGibberish) {
-      const offense = handleGibberishOffense(clientIp, gibberishCheck.reason);
-      return res.status(offense.isBannedNow ? 429 : 400).json({
+    const gib = checkGibberish(lastUserMsg);
+    if (gib.isGibberish) {
+      rec.warnings = (rec.warnings || 0) + 1;
+      const isBannedNow = rec.warnings >= 3;
+      if (isBannedNow) {
+        rec.bannedUntil = now + TWENTY_FOUR_HOURS;
+      }
+      return res.status(isBannedNow ? 429 : 400).json({
         success: false,
-        error: offense.message,
-        reply: offense.message,
-        warningCount: offense.warningCount,
-        isBannedNow: offense.isBannedNow,
-        bannedUntil: offense.bannedUntil,
         isGibberish: true,
+        warningCount: rec.warnings,
+        isBannedNow,
+        error: isBannedNow
+          ? '3 spam strikes reached. Your device is restricted for 24 hours.'
+          : `Spam warning ${rec.warnings} of 3: Please enter a clear grocery store question.`,
       });
     }
   }
 
+  // Fallback intelligent grocery response helper
+  const generateFallbackResponse = () => {
+    const lowStockList =
+      storeContext?.lowStockItems?.map((i: any) => `${i.name} (only ${i.stock} left)`).join(', ') ||
+      'Honeycrisp Apples, Pasture Eggs, Whole Milk';
+    const topSellers =
+      storeContext?.topSellingItems?.map((i: any) => `${i.name} ($${i.price})`).join(', ') ||
+      'Large Brown Eggs, Whole Milk, Bananas';
+    const outOfStock = storeContext?.outOfStockItems?.join(', ') || 'Organic Jasmine Rice';
+
+    const q = lastUserMsg.toLowerCase();
+    let reply = `### 📊 FreshMart Store Insights\n\n`;
+
+    if (q.includes('trend') || q.includes('popular') || q.includes('best seller')) {
+      reply += `🔥 **Top Velocity Grocery Items:**\n${
+        storeContext?.topSellingItems?.map((i: any, idx: number) => `${idx + 1}. **${i.name}** — ${i.sales} units sold ($${i.price})`).join('\n') || topSellers
+      }\n\n💡 *Action:* Keep these items positioned near main checkout entrances to maximize sales momentum.`;
+    } else if (q.includes('low') || q.includes('reorder') || q.includes('stock') || q.includes('empty')) {
+      reply += `⚠️ **Urgent Stock Alerts:**\n• **Out of stock:** ${outOfStock}\n• **Critically low:** ${lowStockList}\n\n📦 *Recommendation:* Reorder staple grocery lines immediately to prevent lost sales.`;
+    } else if (q.includes('bundle') || q.includes('discount') || q.includes('promo') || q.includes('deal')) {
+      reply += `🏷️ **Recommended Promotional Bundle:**\n• **"Farm Fresh Breakfast Basket"**\n  - Large Brown Eggs + Whole Milk + Sourdough Loaf\n  - Bundle Promo Price: $12.99 (Save 12%)\n  - *Benefit:* High margin basket-builder with strong shopper appeal.`;
+    } else {
+      reply += `• **Active Catalog:** ${storeContext?.totalProducts || 18} unique grocery products\n• **Top Performing Lines:** ${topSellers}\n• **Low Stock Attention:** ${lowStockList}\n• **Total Transactions Logged:** ${storeContext?.recentSalesCount || 3} receipts\n\nAsk me about trending sales, restocking quantities, or grocery bundles!`;
+    }
+    return reply;
+  };
+
   const apiKey = getApiKey();
+
   if (apiKey) {
     try {
       const ai = new GoogleGenAI({
@@ -81,7 +185,7 @@ You help grocery store cashiers and managers with:
 - Highlighting slow-moving or perishable inventory at risk
 - Suggesting grocery promotion bundles and pricing optimizations
 - Store Context Data: ${JSON.stringify(storeContext || {})}
-If a user prompt is unclear or marginally coherent, politely ask them to rephrase and refuse to engage in non-grocery random babbling. Format your answers cleanly with concise markdown bullet points, clear grocery advice, and actionable numbers.`;
+Format your answers cleanly with concise markdown bullet points, clear grocery advice, and actionable numbers.`;
 
       const contents = (messages || []).map((m: { role: string; content: string }) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
@@ -96,56 +200,32 @@ If a user prompt is unclear or marginally coherent, politely ask them to rephras
         },
       });
 
-      // Record successful legitimate request
-      const updatedRecord = recordSuccessfulRequest(clientIp);
+      rec.count += 1;
 
       return res.status(200).json({
         success: true,
-        reply: response.text || "I'm ready to assist with your grocery store operations.",
+        reply: response.text || generateFallbackResponse(),
         source: 'gemini-2.5-flash',
         security: {
-          remainingRequests: Math.max(0, 15 - updatedRecord.request_count),
-          warningCount: updatedRecord.warning_count,
+          remainingRequests: Math.max(0, 15 - rec.count),
+          warningCount: rec.warnings,
           ip: clientIp,
         },
       });
     } catch (error: any) {
-      console.warn('Gemini Chat fallback triggered:', error.message);
+      console.warn('Gemini API call failed, using intelligent grocery engine:', error?.message);
     }
   }
 
-  // Fallback if API key missing or rate-limited: Context-grounded intelligent grocery store response
-  const updatedRecord = recordSuccessfulRequest(clientIp);
-  const lowStockList =
-    storeContext?.lowStockItems?.map((i: any) => `${i.name} (only ${i.stock} left)`).join(', ') ||
-    'Honeycrisp Apples, Pasture Eggs, Spinach';
-  const topSellers =
-    storeContext?.topSellingItems?.map((i: any) => `${i.name} ($${i.price})`).join(', ') ||
-    'Large Brown Eggs, Milk 1 Gal, Bananas';
-  const outOfStock = storeContext?.outOfStockItems?.join(', ') || 'Organic Jasmine Rice';
-
-  let fallbackReply = `Here is the operational analysis for your store:\n\n`;
-  const q = lastUserMsg.toLowerCase();
-
-  if (q.includes('trend') || q.includes('popular') || q.includes('best seller')) {
-    fallbackReply += `🔥 **Trending High-Velocity Items:**\n${
-      storeContext?.topSellingItems?.map((i: any, idx: number) => `${idx + 1}. **${i.name}** — High sales count (${i.sales} sold, retail $${i.price})`).join('\n') || topSellers
-    }\n\n💡 *Action:* Keep these stocked on main entrance displays to maintain sales momentum.`;
-  } else if (q.includes('low') || q.includes('reorder') || q.includes('stock') || q.includes('empty')) {
-    fallbackReply += `⚠️ **Urgent Inventory Alerts:**\n• **Out of stock:** ${outOfStock}\n• **Critically low:** ${lowStockList}\n\n📦 *Recommendation:* Issue reorders today for these staple lines to prevent customer walkouts.`;
-  } else if (q.includes('bundle') || q.includes('discount') || q.includes('promo') || q.includes('deal')) {
-    fallbackReply += `🏷️ **Recommended Promotional Grocery Bundle:**\n• **"Farm Fresh Breakfast Basket"**\n  - Large Brown Eggs + Milk 1 Gal + Artisan Sourdough Boule\n  - Normal Total: $14.77 → Bundle Special: $12.99 (Save 12%)\n  - Benefit: High-margin pairing that increases average basket value.`;
-  } else {
-    fallbackReply += `📊 **Store Operational Snapshot:**\n• **Active Catalog:** ${storeContext?.totalProducts || 18} unique grocery products\n• **Top Performing Lines:** ${topSellers}\n• **Low Stock Attention:** ${lowStockList}\n• **Total Transactions Logged:** ${storeContext?.recentSalesCount || 3} receipts\n\nFeel free to ask me to analyze trending lines, calculate reorder quantities, or draft promotional bundles!`;
-  }
-
+  // Fallback if API key missing or call failed
+  rec.count += 1;
   return res.status(200).json({
     success: true,
-    reply: fallbackReply,
+    reply: generateFallbackResponse(),
     source: 'store-engine',
     security: {
-      remainingRequests: Math.max(0, 15 - updatedRecord.request_count),
-      warningCount: updatedRecord.warning_count,
+      remainingRequests: Math.max(0, 15 - rec.count),
+      warningCount: rec.warnings,
       ip: clientIp,
     },
   });

@@ -12,7 +12,14 @@ import {
   RegisteredBusiness,
 } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_SETTINGS, INITIAL_STAFF, INITIAL_TRANSACTIONS } from '../data/initialData';
-import { syncInventoryToSupabase, syncSaleToSupabase } from '../services/supabaseService';
+import {
+  syncInventoryToSupabase,
+  syncSaleToSupabase,
+  syncBusinessToSupabase,
+  syncStaffToSupabase,
+  isSupabaseConfigured,
+  fetchStoreFromSupabase,
+} from '../services/supabaseService';
 import { downloadReceiptPdf } from '../utils/receiptPdf';
 
 export interface ToastMessage {
@@ -564,7 +571,11 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         transaction,
         settings.businessId || 'default_store',
         settings.storeName || 'FreshMart'
-      );
+      ).then((synced) => {
+        if (synced) {
+          showToast('Cloud Database Sync', `Sale #${receiptNumber} synced to Supabase pos_sales.`, 'info');
+        }
+      });
 
       return transaction;
     },
@@ -726,6 +737,17 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `Welcome to ${storeData.settings.storeName || 'your store'}. Terminal is ready.`,
         'success'
       );
+
+      // Background sync to Supabase
+      const targetBizId = storeData.settings.businessId || 'default_store';
+      const targetStoreName = storeData.settings.storeName || 'FreshMart';
+      syncBusinessToSupabase({ ...INITIAL_SETTINGS, ...storeData.settings, isOnboarded: true });
+      if (storeData.products && storeData.products.length > 0) {
+        syncInventoryToSupabase(storeData.products, targetBizId, targetStoreName);
+      }
+      if (storeData.staff && storeData.staff.length > 0) {
+        syncStaffToSupabase(storeData.staff, targetBizId, targetStoreName);
+      }
     },
     [showToast]
   );
@@ -816,6 +838,15 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `${newSettings.storeName} is ready with ID "${cleanBizId}". Terminal is live.`,
         'success'
       );
+
+      // Multi-tenant Supabase Cloud Sync
+      syncBusinessToSupabase(newSettings);
+      if (finalProducts.length > 0) {
+        syncInventoryToSupabase(finalProducts, cleanBizId, newSettings.storeName);
+      }
+      if (finalStaff.length > 0) {
+        syncStaffToSupabase(finalStaff, cleanBizId, newSettings.storeName);
+      }
     },
     [showToast]
   );

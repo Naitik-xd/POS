@@ -11,6 +11,7 @@ import { AuthModal } from './components/AuthModal';
 import { AutomatedAlertsDrawer } from './components/AutomatedAlertsDrawer';
 import { BottomNavbar } from './components/BottomNavbar';
 import { ManagerPanelModal } from './components/ManagerPanelModal';
+import { SupabaseSyncModal } from './components/SupabaseSyncModal';
 import {
   CheckCircle2,
   AlertCircle,
@@ -26,6 +27,7 @@ const POSAppContent: React.FC = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
   const [isManagerPanelOpen, setIsManagerPanelOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200 overflow-x-hidden">
@@ -74,6 +76,7 @@ const POSAppContent: React.FC = () => {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenAlerts={() => setIsAlertsDrawerOpen(true)}
         onOpenManagerPanel={() => setIsManagerPanelOpen(true)}
+        onOpenSupabaseSync={() => setIsSupabaseModalOpen(true)}
       />
 
       {/* Modals & Drawers */}
@@ -85,6 +88,11 @@ const POSAppContent: React.FC = () => {
       <ManagerPanelModal
         isOpen={isManagerPanelOpen}
         onClose={() => setIsManagerPanelOpen(false)}
+        onOpenSupabaseSync={() => setIsSupabaseModalOpen(true)}
+      />
+      <SupabaseSyncModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
       />
 
       {/* Global Interactive Toast Notification Stack (raised above bottom navbar) */}

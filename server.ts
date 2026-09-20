@@ -19,6 +19,27 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Security Headers Middleware (A+ rating on Observatory / SecurityHeaders)
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(self), microphone=(), geolocation=(), browsing-topics=()"
+  );
+  res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-ancestors 'self' https://ai.studio https://*.google.com https://*.run.app; base-uri 'self'; form-action 'self'; object-src 'none';"
+  );
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 
 // Helper to retrieve Gemini API key (supports Vercel secret GAPI_POS and fallback GEMINI_API_KEY)
