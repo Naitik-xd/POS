@@ -18,26 +18,21 @@ import {
   ShieldCheck,
   ShieldAlert,
   Building2,
-  Database,
-  Cloud,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ActiveTab, UserRole } from '../types';
 import { RoleSwitchPinModal } from './RoleSwitchPinModal';
-import { isSupabaseConfigured } from '../services/supabaseService';
 
 interface BottomNavbarProps {
   onOpenAuth: () => void;
   onOpenAlerts: () => void;
   onOpenManagerPanel?: () => void;
-  onOpenSupabaseSync?: () => void;
 }
 
 export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   onOpenAuth,
   onOpenAlerts,
   onOpenManagerPanel,
-  onOpenSupabaseSync,
 }) => {
   const {
     activeTab,
@@ -254,30 +249,6 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 )}
               </button>
 
-              {/* Supabase Cloud Database Button */}
-              {onOpenSupabaseSync && (
-                <button
-                  id="bottom-bar-cloud-sync-btn"
-                  type="button"
-                  onClick={onOpenSupabaseSync}
-                  title={
-                    isSupabaseConfigured()
-                      ? 'Supabase Cloud: Connected & Active'
-                      : 'Supabase Cloud: Configure Database Connection'
-                  }
-                  className={`p-2 rounded-xl transition flex items-center space-x-1.5 ${
-                    isSupabaseConfigured()
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
-                >
-                  <Database className="w-4 h-4" />
-                  {isSupabaseConfigured() && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  )}
-                </button>
-              )}
-
               {/* Light / Dark Mode Toggle */}
               <button
                 id="bottom-bar-theme-btn"
@@ -493,42 +464,6 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                   </div>
                 </button>
               </div>
-
-              {/* Cloud Database (Supabase) Sync Full Row */}
-              {onOpenSupabaseSync && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenSupabaseSync();
-                  }}
-                  className={`w-full p-3 rounded-2xl border flex items-center justify-between transition ${
-                    isSupabaseConfigured()
-                      ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
-                      : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Database
-                      className={`w-4 h-4 ${
-                        isSupabaseConfigured() ? 'text-emerald-600' : 'text-zinc-600 dark:text-zinc-400'
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                      Supabase Cloud Database
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      isSupabaseConfigured()
-                        ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
-                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                    }`}
-                  >
-                    {isSupabaseConfigured() ? 'Connected' : 'Setup / Sync'}
-                  </span>
-                </button>
-              )}
 
               {/* Low Stock / Inventory Alerts Full Row */}
               <button

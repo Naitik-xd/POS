@@ -566,16 +566,12 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       showToast('Sale Completed!', `Receipt #${receiptNumber} for $${transaction.totalAmount.toFixed(2)}`, 'success');
 
-      // 4. Background sync to Supabase if connected
+      // 4. Background silent sync to Supabase if connected
       syncSaleToSupabase(
         transaction,
         settings.businessId || 'default_store',
         settings.storeName || 'FreshMart'
-      ).then((synced) => {
-        if (synced) {
-          showToast('Cloud Database Sync', `Sale #${receiptNumber} synced to Supabase pos_sales.`, 'info');
-        }
-      });
+      );
 
       return transaction;
     },

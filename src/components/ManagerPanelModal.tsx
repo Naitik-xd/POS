@@ -23,13 +23,11 @@ import { User, UserRole } from '../types';
 interface ManagerPanelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenSupabaseSync?: () => void;
 }
 
 export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
   isOpen,
   onClose,
-  onOpenSupabaseSync,
 }) => {
   const {
     currentUser,
@@ -177,27 +175,13 @@ export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {onOpenSupabaseSync && (
-              <button
-                type="button"
-                onClick={onOpenSupabaseSync}
-                title="Configure Cloud Database Sync"
-                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition flex items-center space-x-1.5"
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Supabase Cloud</span>
-              </button>
-            )}
-
-            <button
-              id="btn-close-manager-panel"
-              onClick={onClose}
-              className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            id="btn-close-manager-panel"
+            onClick={onClose}
+            className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Tab Selector */}
