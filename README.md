@@ -79,7 +79,7 @@ When connecting your GitHub repository to **Vercel**, navigate to **Project Sett
 - **Rate Limit**: Maximum 15 AI requests per 3 hours per IP.
 - **Gibberish Detection**: Uses Shannon entropy analysis and keyboard-smash pattern matching.
 - **3-Warning Rule**: Users submitting spam/gibberish receive 3 warnings; the 3rd strike triggers an automatic **24-hour temporary ban**.
-- **Permanent Ban (`perma_ban`)**: Controlled exclusively by the manager in the Manager Panel (`pos_ai_security.perma_ban` boolean field).
+- **Permanent Ban (`perma_ban`)**: Controlled directly in your Supabase backend (`pos_ai_security.perma_ban` boolean field). When set to `true`, the IP is permanently denied access without exposing IP addresses in the POS client.
 
 
 ### How to Apply the Schema in Supabase:

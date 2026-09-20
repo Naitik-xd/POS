@@ -15,9 +15,7 @@ import {
   RotateCcw,
   Zap,
   ShieldAlert,
-  Clock,
   Ban,
-  Activity,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 
@@ -271,33 +269,6 @@ export const GeminiInsightsDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Security & Rate Limit Pill */}
-          <div className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs">
-            <Activity className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-zinc-600 dark:text-zinc-300 font-medium">
-              Rate Limit:{' '}
-              <strong className={securityStatus.remainingRequests <= 3 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}>
-                {securityStatus.remainingRequests}/15
-              </strong>{' '}
-              <span className="text-[10px] text-zinc-400">(3h window)</span>
-            </span>
-            {securityStatus.warningCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-300 dark:border-amber-800">
-                ⚠️ Warnings: {securityStatus.warningCount}/3
-              </span>
-            )}
-            {securityStatus.isBanned && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[10px] font-bold border border-rose-300 dark:border-rose-800">
-                🚫 24h Ban Active
-              </span>
-            )}
-            {securityStatus.isPermaBanned && (
-              <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
-                ⛔ PERMA-BANNED
-              </span>
-            )}
-          </div>
-
           <button
             onClick={clearChat}
             title="Reset Conversation"

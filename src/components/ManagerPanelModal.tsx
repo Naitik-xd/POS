@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ShieldAlert,
   Users,
@@ -16,15 +16,9 @@ import {
   ArrowRight,
   Shield,
   Store,
-  Ban,
-  Activity,
-  RotateCcw,
-  Globe,
-  Clock,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { User, UserRole } from '../types';
-import { togglePermaBanInSupabase } from '../services/supabaseService';
 
 interface ManagerPanelModalProps {
   isOpen: boolean;
@@ -49,105 +43,10 @@ export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
     showToast,
   } = usePOS();
 
-  const [activeTab, setActiveTab] = useState<'employees' | 'ai_security' | 'delete_store'>('employees');
-
-  // AI Security Tab State
-  const [securityRecords, setSecurityRecords] = useState<any[]>([]);
-  const [currentClientIp, setCurrentClientIp] = useState<string>('');
-  const [manualIpInput, setManualIpInput] = useState<string>('');
-  const [isUpdatingBan, setIsUpdatingBan] = useState<boolean>(false);
-  const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
-
-  // Fetch security records when tab opens
-  const fetchSecurityStatus = async () => {
-    setIsLoadingSecurity(true);
-    try {
-      const res = await fetch('/api/security/ip-status');
-      const data = await res.json();
-      if (data) {
-        setCurrentClientIp(data.clientIp || '');
-        setSecurityRecords(data.allRecords || []);
-      }
-    } catch (err) {
-      console.error('Failed to load security records:', err);
-    } finally {
-      setIsLoadingSecurity(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && activeTab === 'ai_security') {
-      fetchSecurityStatus();
-    }
-  }, [isOpen, activeTab]);
-
-  const handleTogglePermaBan = async (targetIp: string, currentStatus: boolean) => {
-    const newStatus = !currentStatus;
-    setIsUpdatingBan(true);
-    try {
-      // 1. Update in backend server
-      const res = await fetch('/api/security/set-perma-ban', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip: targetIp,
-          perma_ban: newStatus,
-          notes: newStatus ? `Perma-banned by manager ${currentUser.name}` : `Perma-ban revoked by manager ${currentUser.name}`,
-        }),
-      });
-      const data = await res.json();
-
-      // 2. Sync to Supabase table pos_ai_security
-      await togglePermaBanInSupabase(targetIp, newStatus);
-
-      showToast(
-        newStatus ? 'IP Perma-Banned' : 'Perma-Ban Revoked',
-        `IP ${targetIp} perma_ban is now set to ${newStatus}.`,
-        newStatus ? 'error' : 'success'
-      );
-
-      fetchSecurityStatus();
-    } catch (err: any) {
-      showToast('Error', err.message || 'Could not update ban status.', 'error');
-    } finally {
-      setIsUpdatingBan(false);
-    }
-  };
-
-  const handleResetWarnings = async (targetIp: string) => {
-    setIsUpdatingBan(true);
-    try {
-      await fetch('/api/security/set-perma-ban', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip: targetIp,
-          reset_warnings: true,
-        }),
-      });
-
-      showToast('Warnings Cleared', `Cleared strikes and 24h ban for IP ${targetIp}.`, 'success');
-      fetchSecurityStatus();
-    } catch (err: any) {
-      showToast('Error', err.message || 'Could not reset warnings.', 'error');
-    } finally {
-      setIsUpdatingBan(false);
-    }
-  };
-
-  const handleAddManualIpBan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanIp = manualIpInput.trim();
-    if (!cleanIp) {
-      showToast('Invalid IP', 'Please enter a valid IP address.', 'warning');
-      return;
-    }
-    await handleTogglePermaBan(cleanIp, false); // Turn it to true
-    setManualIpInput('');
-  };
-
+  const [activeTab, setActiveTab] = useState<'employees' | 'delete_store'>('employees');
 
   // Add Employee Form State
+
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffRole, setNewStaffRole] = useState<UserRole>('cashier');
   const [newStaffPin, setNewStaffPin] = useState('');
@@ -298,26 +197,9 @@ export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Staff & PIN</span>
+            <span>Staff & PIN Management</span>
             <span className="ml-1.5 px-2 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
               {staffList.length}
-            </span>
-          </button>
-
-          <button
-            id="tab-btn-ai-security"
-            type="button"
-            onClick={() => setActiveTab('ai_security')}
-            className={`flex items-center space-x-2 py-3 px-3 border-b-2 text-xs font-bold transition ${
-              activeTab === 'ai_security'
-                ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 text-indigo-500" />
-            <span>AI Security & Bans</span>
-            <span className="ml-1.5 px-2 py-0.5 rounded-full text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono">
-              15/3h
             </span>
           </button>
 
@@ -332,7 +214,7 @@ export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
             }`}
           >
             <Trash2 className="w-4 h-4 text-rose-500" />
-            <span>Delete Store</span>
+            <span>Delete Store (Danger Zone)</span>
           </button>
         </div>
 
@@ -667,184 +549,7 @@ export const ManagerPanelModal: React.FC<ManagerPanelModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: AI SECURITY & PERMA-BAN CONTROLS */}
-          {activeTab === 'ai_security' && (
-            <div className="space-y-5">
-              {/* Header Box */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50/60 dark:bg-indigo-950/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/40">
-                <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-indigo-950 dark:text-indigo-200 flex items-center space-x-2">
-                    <Shield className="w-4 h-4 text-indigo-600" />
-                    <span>AI Abuse Guard & Rate Limiting Engine</span>
-                  </h4>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    15 requests per 3 hours / IP • 3 gibberish warnings then 24h ban • Permanent ban controlled by you
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={fetchSecurityStatus}
-                  disabled={isLoadingSecurity}
-                  className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-white dark:bg-zinc-800 hover:bg-indigo-50 text-xs font-semibold flex items-center space-x-1.5 self-start sm:self-auto transition disabled:opacity-50"
-                >
-                  <RotateCcw className={`w-3.5 h-3.5 ${isLoadingSecurity ? 'animate-spin' : ''}`} />
-                  <span>Refresh IPs</span>
-                </button>
-              </div>
-
-              {/* Security Rule Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                    <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Rate Limit</span>
-                  </div>
-                  <p className="text-lg font-extrabold text-zinc-900 dark:text-white">15 Req / 3 Hrs</p>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Rolling window per client IP</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Gibberish Guard</span>
-                  </div>
-                  <p className="text-lg font-extrabold text-zinc-900 dark:text-white">3 Strikes → 24h Ban</p>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Shannon entropy & spam detector</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
-                  <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                    <Ban className="w-3.5 h-3.5 text-red-600" />
-                    <span>Permanent Ban</span>
-                  </div>
-                  <p className="text-lg font-extrabold text-zinc-900 dark:text-white">Owner Control</p>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Field: `perma_ban` (Supabase)</p>
-                </div>
-              </div>
-
-              {/* Add Manual IP Ban Form */}
-              <form onSubmit={handleAddManualIpBan} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter IP to Perma-Ban (e.g. 192.168.1.100 or public IP)..."
-                  value={manualIpInput}
-                  onChange={(e) => setManualIpInput(e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-hidden focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white font-mono"
-                />
-                <button
-                  type="submit"
-                  disabled={!manualIpInput.trim() || isUpdatingBan}
-                  className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center space-x-1.5 disabled:opacity-50 shrink-0"
-                >
-                  <Ban className="w-3.5 h-3.5" />
-                  <span>Perma-Ban IP</span>
-                </button>
-              </form>
-
-              {/* Active IP Security Table */}
-              <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  <span>Tracked IP Records ({securityRecords.length})</span>
-                  {currentClientIp && (
-                    <span className="font-mono text-[11px] font-normal text-zinc-500">
-                      Your IP: <strong className="text-zinc-800 dark:text-zinc-200">{currentClientIp}</strong>
-                    </span>
-                  )}
-                </div>
-
-                {securityRecords.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                    <Shield className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-600 mb-2" />
-                    No active abuse or bans detected yet. Safe operation!
-                  </div>
-                ) : (
-                  <div className="divide-y divide-zinc-200 dark:divide-zinc-800 max-h-72 overflow-y-auto">
-                    {securityRecords.map((rec: any, idx: number) => {
-                      const isCurrent = rec.ip === currentClientIp;
-                      return (
-                        <div
-                          key={idx}
-                          className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition"
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-mono font-bold text-xs text-zinc-900 dark:text-white">
-                                {rec.ip}
-                              </span>
-                              {isCurrent && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                  Current Device
-                                </span>
-                              )}
-                              {rec.perma_ban ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white">
-                                  ⛔ PERMA-BANNED
-                                </span>
-                              ) : rec.is_banned ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300">
-                                  🚫 24h Ban Active
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
-                                  ✓ Allowed
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center space-x-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-                              <span>
-                                Requests: <strong className="text-zinc-800 dark:text-zinc-200">{rec.request_count}/15</strong>
-                              </span>
-                              <span>•</span>
-                              <span>
-                                Warnings: <strong className={rec.warning_count > 0 ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}>{rec.warning_count}/3</strong>
-                              </span>
-                              {rec.notes && (
-                                <>
-                                  <span>•</span>
-                                  <span className="italic">{rec.notes}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-2 shrink-0">
-                            {rec.warning_count > 0 || rec.is_banned ? (
-                              <button
-                                type="button"
-                                disabled={isUpdatingBan}
-                                onClick={() => handleResetWarnings(rec.ip)}
-                                className="px-2.5 py-1 rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 hover:bg-amber-50 text-[11px] font-semibold transition"
-                              >
-                                Clear Strikes
-                              </button>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              disabled={isUpdatingBan}
-                              onClick={() => handleTogglePermaBan(rec.ip, rec.perma_ban)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
-                                rec.perma_ban
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                  : 'bg-red-600 hover:bg-red-700 text-white'
-                              }`}
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                              <span>{rec.perma_ban ? 'Unban (Set False)' : 'Perma Ban (Set True)'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: DELETE STORE & DANGER ZONE */}
+          {/* TAB 2: DELETE STORE & DANGER ZONE */}
           {activeTab === 'delete_store' && (
             <div className="space-y-5">
               {/* Store Summary Card */}
