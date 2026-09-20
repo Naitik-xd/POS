@@ -1,0 +1,6 @@
+{
+  "name": "Grocery POS & Inventory System",
+  "description": "Full-stack grocery Point of Sale (POS) system with inventory management, automated low-stock alerts, billing terminal, real-time sales reporting, employee & manager authentication, and Gemini AI retail trends intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
