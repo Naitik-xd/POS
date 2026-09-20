@@ -90,10 +90,12 @@ interface POSContextType {
   switchRole: (role: UserRole) => void;
   addStaff: (staff: Omit<User, 'id'>) => void;
   updateStaffRole: (id: string, role: UserRole) => void;
+  updateStaffPin: (id: string, newPin: string) => boolean;
   deleteStaff: (id: string) => void;
   archiveReceiptPdf: (saleId: string) => void;
   isManager: boolean;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
+  deleteStore: (targetBusinessId?: string, confirmationPassword?: string) => boolean;
 
   // Business Multi-tenant & Demo Operations
   loadDemoStore: () => void;
@@ -988,6 +990,39 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [currentUser.id, showToast]
   );
 
+  const updateStaffPin = useCallback(
+    (id: string, newPin: string): boolean => {
+      const cleanPin = newPin.trim();
+      if (!/^\d{4}$/.test(cleanPin)) {
+        showToast('Invalid PIN Format', 'Employee PIN must be exactly 4 numeric digits.', 'error');
+        return false;
+      }
+
+      let updatedStaffName = '';
+      setStaffList((prev) =>
+        prev.map((s) => {
+          if (s.id === id) {
+            updatedStaffName = s.name;
+            return { ...s, pin: cleanPin };
+          }
+          return s;
+        })
+      );
+
+      if (currentUser.id === id) {
+        setCurrentUser((prev) => ({ ...prev, pin: cleanPin }));
+      }
+
+      showToast(
+        'PIN Updated Successfully',
+        `Security PIN for ${updatedStaffName || 'employee'} has been changed.`,
+        'success'
+      );
+      return true;
+    },
+    [currentUser.id, showToast]
+  );
+
   const deleteStaff = useCallback(
     (id: string) => {
       if (currentUser.id === id) {
@@ -1020,6 +1055,75 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Settings Saved', 'Store configuration updated.', 'success');
     },
     [showToast]
+  );
+
+  const deleteStore = useCallback(
+    (targetBusinessId?: string, confirmationPassword?: string): boolean => {
+      const bizIdToDelete = (targetBusinessId || settings.businessId || '').trim().toLowerCase();
+      if (!bizIdToDelete) {
+        showToast('Delete Failed', 'No active business ID identified to delete.', 'error');
+        return false;
+      }
+
+      // Check if password verification is required
+      if (confirmationPassword !== undefined) {
+        const isDemo = bizIdToDelete === 'demo_freshmart' || settings.isDemoMode;
+        const requiredPass = isDemo ? 'demo1234' : (settings.adminPassword || '');
+        if (requiredPass && confirmationPassword.trim() !== requiredPass.trim()) {
+          showToast('Authorization Failed', 'Incorrect administrator password. Store deletion rejected.', 'error');
+          return false;
+        }
+      }
+
+      const storeName = settings.storeName || 'Store';
+
+      // 1. Remove from registered businesses list
+      setRegisteredBusinesses((prev) => prev.filter((b) => b.businessId.toLowerCase() !== bizIdToDelete));
+
+      // 2. Clear all active store state to clean blank state
+      const cleanSettings: StoreSettings = {
+        ...INITIAL_SETTINGS,
+        storeName: 'Grocery POS',
+        businessId: '',
+        adminPassword: '',
+        isOnboarded: false,
+        isDemoMode: false,
+      };
+
+      setSettings(cleanSettings);
+      setProducts([]);
+      setSales([]);
+      setStaffList([]);
+      setCurrentUser({
+        id: 'guest',
+        name: 'Guest User',
+        email: 'guest@store.local',
+        role: 'cashier',
+        pin: '0000',
+      });
+      setCart([]);
+      setHeldCarts([]);
+
+      // 3. Clear local storage
+      try {
+        localStorage.removeItem('freshmart_products');
+        localStorage.removeItem('freshmart_sales');
+        localStorage.removeItem('freshmart_staff');
+        localStorage.setItem('freshmart_settings', JSON.stringify(cleanSettings));
+      } catch (e) {
+        console.error(e);
+      }
+
+      setActiveTab('welcome');
+      playTone('alert');
+      showToast(
+        'Store Deleted Permanently',
+        `"${storeName}" (ID: ${bizIdToDelete}) and all its inventory, sales, and employee data have been deleted.`,
+        'success'
+      );
+      return true;
+    },
+    [settings, showToast]
   );
 
   return (
@@ -1074,10 +1178,12 @@ export const POSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchRole,
         addStaff,
         updateStaffRole,
+        updateStaffPin,
         deleteStaff,
         archiveReceiptPdf,
         isManager,
         updateSettings,
+        deleteStore,
         loadDemoStore,
         loginBusiness,
         registerBusiness,

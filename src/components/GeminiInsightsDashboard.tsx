@@ -14,6 +14,10 @@ import {
   ShieldCheck,
   RotateCcw,
   Zap,
+  ShieldAlert,
+  Clock,
+  Ban,
+  Activity,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 
@@ -22,7 +26,10 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  isWarning?: boolean;
+  isBan?: boolean;
 }
+
 
 export const GeminiInsightsDashboard: React.FC = () => {
   const { products, sales, currentUser, settings } = usePOS();
@@ -37,9 +44,44 @@ export const GeminiInsightsDashboard: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [securityStatus, setSecurityStatus] = useState<{
+    remainingRequests: number;
+    warningCount: number;
+    ip?: string;
+    isBanned?: boolean;
+    isPermaBanned?: boolean;
+    bannedUntil?: string | null;
+  }>({
+    remainingRequests: 15,
+    warningCount: 0,
+    isBanned: false,
+    isPermaBanned: false,
+    bannedUntil: null,
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Poll or fetch security IP status on load
+  useEffect(() => {
+    fetch('/api/security/ip-status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.currentRecord) {
+          setSecurityStatus({
+            remainingRequests: Math.max(0, 15 - (data.currentRecord.request_count || 0)),
+            warningCount: data.currentRecord.warning_count || 0,
+            ip: data.clientIp,
+            isBanned: data.currentRecord.is_banned,
+            isPermaBanned: data.currentRecord.perma_ban,
+            bannedUntil: data.currentRecord.banned_until,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const quickQuestions = [
+
     {
       icon: TrendingUp,
       label: 'Trending items & top sellers',
@@ -122,6 +164,39 @@ export const GeminiInsightsDashboard: React.FC = () => {
       });
 
       const data = await res.json();
+
+      // Check if security blocked or warnings returned
+      if (data.security) {
+        setSecurityStatus((prev) => ({
+          ...prev,
+          remainingRequests: data.security.remainingRequests,
+          warningCount: data.security.warningCount,
+          ip: data.security.ip,
+        }));
+      }
+
+      if (!res.ok || data.securityBlocked || data.isGibberish) {
+        if (data.warningCount !== undefined) {
+          setSecurityStatus((prev) => ({
+            ...prev,
+            warningCount: data.warningCount,
+            isBanned: data.isBannedNow,
+            bannedUntil: data.bannedUntil,
+          }));
+        }
+
+        const warningMsg: ChatMessage = {
+          id: `warn-${Date.now()}`,
+          role: 'assistant',
+          content: data.error || data.reply || 'Security alert: request blocked.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isWarning: !data.isBannedNow,
+          isBan: data.isBannedNow || data.securityBlocked,
+        };
+        setMessages((prev) => [...prev, warningMsg]);
+        return;
+      }
+
       const replyContent =
         data.reply ||
         (data.success ? 'Analysis complete.' : 'Unable to connect to AI engine at this time.');
@@ -135,6 +210,7 @@ export const GeminiInsightsDashboard: React.FC = () => {
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
+
       console.error('Chat error:', err);
       const errorMsg: ChatMessage = {
         id: `ai-err-${Date.now()}`,
@@ -195,6 +271,33 @@ export const GeminiInsightsDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Security & Rate Limit Pill */}
+          <div className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs">
+            <Activity className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="text-zinc-600 dark:text-zinc-300 font-medium">
+              Rate Limit:{' '}
+              <strong className={securityStatus.remainingRequests <= 3 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}>
+                {securityStatus.remainingRequests}/15
+              </strong>{' '}
+              <span className="text-[10px] text-zinc-400">(3h window)</span>
+            </span>
+            {securityStatus.warningCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-300 dark:border-amber-800">
+                ⚠️ Warnings: {securityStatus.warningCount}/3
+              </span>
+            )}
+            {securityStatus.isBanned && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[10px] font-bold border border-rose-300 dark:border-rose-800">
+                🚫 24h Ban Active
+              </span>
+            )}
+            {securityStatus.isPermaBanned && (
+              <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">
+                ⛔ PERMA-BANNED
+              </span>
+            )}
+          </div>
+
           <button
             onClick={clearChat}
             title="Reset Conversation"
@@ -205,6 +308,7 @@ export const GeminiInsightsDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
 
       {/* Main Content: Split Grid on Desktop, Fluid on Mobile */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 pt-3 overflow-hidden min-h-0">
@@ -298,10 +402,22 @@ export const GeminiInsightsDashboard: React.FC = () => {
                     className={`w-8 h-8 sm:w-9 sm:h-9 rounded-2xl flex items-center justify-center shrink-0 text-xs font-bold ${
                       isUser
                         ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs'
+                        : m.isBan
+                        ? 'bg-red-600 text-white shadow-xs animate-pulse'
+                        : m.isWarning
+                        ? 'bg-amber-500 text-white shadow-xs'
                         : 'bg-gradient-to-tr from-emerald-600 to-teal-600 text-white shadow-xs'
                     }`}
                   >
-                    {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                    {isUser ? (
+                      <User className="w-4 h-4" />
+                    ) : m.isBan ? (
+                      <Ban className="w-4 h-4" />
+                    ) : m.isWarning ? (
+                      <ShieldAlert className="w-4 h-4" />
+                    ) : (
+                      <Bot className="w-4 h-4" />
+                    )}
                   </div>
 
                   {/* Message Content Bubble */}
@@ -309,9 +425,14 @@ export const GeminiInsightsDashboard: React.FC = () => {
                     className={`max-w-[90%] sm:max-w-[80%] rounded-3xl px-4 py-3 text-xs sm:text-sm leading-relaxed relative group ${
                       isUser
                         ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-tr-xs'
+                        : m.isBan
+                        ? 'bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200 rounded-tl-xs shadow-md'
+                        : m.isWarning
+                        ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200 rounded-tl-xs shadow-xs'
                         : 'bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-zinc-800 dark:text-zinc-200 rounded-tl-xs shadow-2xs'
                     }`}
                   >
+
                     <div className="whitespace-pre-wrap font-sans">
                       {m.content.split('\n').map((line, idx) => {
                         if (line.startsWith('### ') || line.startsWith('## ')) {

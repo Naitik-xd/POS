@@ -116,3 +116,25 @@ create policy "Allow all operations on pos_inventory" on pos_inventory for all u
 create policy "Allow all operations on pos_sales" on pos_sales for all using (true) with check (true);
 create policy "Allow all operations on pos_sale_items" on pos_sale_items for all using (true) with check (true);
 create policy "Allow all operations on pos_staff" on pos_staff for all using (true) with check (true);
+
+-- 7. AI Security, Gibberish Guard, Rate Limiting & Ban Controls
+create table if not exists pos_ai_security (
+  id uuid primary key default uuid_generate_v4(),
+  ip varchar(64) not null unique,
+  request_count integer not null default 0,
+  window_start timestamp with time zone default timezone('utc'::text, now()) not null,
+  warning_count integer not null default 0,
+  is_banned boolean not null default false,
+  banned_until timestamp with time zone,
+  perma_ban boolean not null default false,
+  last_request_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_pos_ai_security_ip on pos_ai_security(ip);
+
+-- Enable RLS for pos_ai_security
+alter table pos_ai_security enable row level security;
+create policy "Allow all operations on pos_ai_security" on pos_ai_security for all using (true) with check (true);
+

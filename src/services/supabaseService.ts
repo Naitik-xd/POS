@@ -182,3 +182,57 @@ export async function syncSaleToSupabase(
     return false;
   }
 }
+
+/**
+ * Fetch all AI Security IP records from Supabase
+ */
+export async function fetchAiSecurityRecordsFromSupabase() {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('pos_ai_security')
+      .select('*')
+      .order('last_request_at', { ascending: false });
+
+    if (error) {
+      console.warn('Could not fetch pos_ai_security:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('fetchAiSecurityRecords error:', err);
+    return [];
+  }
+}
+
+/**
+ * Update permanent ban (perma_ban) status for a given IP in Supabase
+ */
+export async function togglePermaBanInSupabase(ip: string, permaBan: boolean, notes?: string) {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('pos_ai_security').upsert(
+      {
+        ip,
+        perma_ban: permaBan,
+        notes: notes || (permaBan ? 'Perma-banned by manager' : 'Perma-ban revoked by manager'),
+        last_request_at: new Date().toISOString(),
+      },
+      { onConflict: 'ip' }
+    );
+
+    if (error) {
+      console.warn('togglePermaBan error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('togglePermaBanInSupabase error:', err);
+    return false;
+  }
+}
+

@@ -16,6 +16,7 @@ import {
   X,
   Info,
   ShieldCheck,
+  ShieldAlert,
   Building2,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
@@ -25,11 +26,13 @@ import { RoleSwitchPinModal } from './RoleSwitchPinModal';
 interface BottomNavbarProps {
   onOpenAuth: () => void;
   onOpenAlerts: () => void;
+  onOpenManagerPanel?: () => void;
 }
 
 export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   onOpenAuth,
   onOpenAlerts,
+  onOpenManagerPanel,
 }) => {
   const {
     activeTab,
@@ -178,6 +181,25 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
                 );
               })}
 
+              {/* Manager Mode Exclusive Quick Icon (Mobile Only) */}
+              {currentUser.role === 'manager' && (
+                <button
+                  type="button"
+                  id="bottom-nav-manager-panel-btn"
+                  onClick={onOpenManagerPanel}
+                  className="relative flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition min-h-[44px] md:hidden touch-manipulation font-bold"
+                  title="Manager Control Panel (Store Deletion, Staff & PINs)"
+                >
+                  <div className="relative">
+                    <ShieldAlert className="w-5 h-5 stroke-[2.2]" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-purple-500 animate-ping" />
+                  </div>
+                  <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap font-bold">
+                    Manager
+                  </span>
+                </button>
+              )}
+
               {/* Mobile "More" Drawer Button (visible only on small screens < md) */}
               <button
                 type="button"
@@ -199,6 +221,20 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
 
             {/* Desktop & Tablet Utility Controls (Hidden on small mobile) */}
             <div className="hidden md:flex items-center space-x-1.5 pl-2 border-l border-zinc-200 dark:border-zinc-800 shrink-0">
+              {/* Manager Mode Exclusive Icon / Button (Appears ONLY when in Manager Mode) */}
+              {currentUser.role === 'manager' && (
+                <button
+                  id="navbar-manager-panel-btn"
+                  type="button"
+                  onClick={onOpenManagerPanel}
+                  title="Manager Control Panel (Delete Store, Staff & PINs)"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold shadow-xs transition"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-purple-200" />
+                  <span className="whitespace-nowrap">Manager Panel</span>
+                </button>
+              )}
+
               {/* Automated Alerts Bell */}
               <button
                 id="bottom-bar-alerts-btn"
@@ -315,6 +351,36 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
 
             {/* Quick Actions Grid */}
             <div className="p-4 space-y-3 overflow-y-auto">
+              {/* Manager Exclusive Banner in Mobile Drawer (Manager Only) */}
+              {currentUser.role === 'manager' && (
+                <button
+                  type="button"
+                  id="mobile-drawer-manager-panel-btn"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenManagerPanel?.();
+                  }}
+                  className="w-full p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-left flex items-center justify-between transition shadow-xs"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-xs">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-purple-900 dark:text-purple-200">
+                        Manager Control Panel
+                      </p>
+                      <p className="text-[11px] text-purple-700 dark:text-purple-400">
+                        Delete store, staff accounts & PINs
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                    Open
+                  </span>
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Role Switch (PIN Protected) */}
                 <button

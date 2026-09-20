@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
   Store,
+  ShieldAlert,
 } from 'lucide-react';
 import { usePOS } from '../context/POSContext';
 import { ActiveTab } from '../types';
@@ -22,9 +23,10 @@ import { ActiveTab } from '../types';
 interface NavbarProps {
   onOpenAlerts: () => void;
   onOpenAuth: () => void;
+  onOpenManagerPanel?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth, onOpenManagerPanel }) => {
   const {
     activeTab,
     setActiveTab,
@@ -138,6 +140,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAlerts, onOpenAuth }) => {
 
           {/* Right Action Tools: Role Switcher, Alerts, Theme toggle, Staff Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Manager Panel Action Button (Visible ONLY in Manager Mode) */}
+            {currentUser.role === 'manager' && (
+              <button
+                id="top-nav-manager-panel-btn"
+                type="button"
+                onClick={onOpenManagerPanel}
+                title="Open Manager Control Panel (Store Deletion, Staff & PINs)"
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold shadow-xs transition"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-purple-200" />
+                <span className="whitespace-nowrap">Manager Panel</span>
+              </button>
+            )}
+
             {/* Quick 1-Click Role Toggle Pill */}
             <button
               id="btn-quick-role-toggle"

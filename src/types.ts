@@ -169,3 +169,17 @@ export type ActiveTab =
   | 'legal_terms'
   | 'legal_privacy';
 
+export interface IpSecurityRecord {
+  id?: string;
+  ip: string;
+  request_count: number;
+  window_start: string;
+  warning_count: number;
+  is_banned: boolean;
+  banned_until: string | null;
+  perma_ban: boolean;
+  last_request_at: string;
+  notes?: string;
+}
+
+

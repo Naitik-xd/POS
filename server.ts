@@ -3,6 +3,16 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import {
+  extractClientIp,
+  validateIpRequest,
+  recordSuccessfulRequest,
+  isGibberish,
+  handleGibberishOffense,
+  getIpSecurityRecord,
+  getAllIpSecurityRecords,
+  updateIpSecurityRecord,
+} from "./src/services/aiSecurityGuard.js";
 
 dotenv.config();
 
@@ -46,10 +56,87 @@ app.get("/api/health", (_req: Request, res: Response) => {
   });
 });
 
+// Endpoint for Manager to inspect IP security status
+app.get("/api/security/ip-status", (req: Request, res: Response) => {
+  const clientIp = extractClientIp(req);
+  const targetIp = (req.query.ip as string) || clientIp;
+  const record = getIpSecurityRecord(targetIp);
+  const allRecords = getAllIpSecurityRecords();
+
+  res.json({
+    clientIp,
+    currentRecord: record,
+    allRecords,
+    limits: {
+      maxRequests: 15,
+      windowHours: 3,
+      gibberishWarningsAllowed: 3,
+      tempBanHours: 24,
+    },
+  });
+});
+
+// Endpoint for Manager to set perma_ban (true/false) or reset IP warnings
+app.post("/api/security/set-perma-ban", (req: Request, res: Response) => {
+  const { ip, perma_ban, notes, reset_warnings } = req.body;
+  if (!ip) {
+    return res.status(400).json({ success: false, error: "IP address is required." });
+  }
+
+  const updates: any = {};
+  if (typeof perma_ban === "boolean") {
+    updates.perma_ban = perma_ban;
+  }
+  if (notes) {
+    updates.notes = notes;
+  }
+  if (reset_warnings) {
+    updates.warning_count = 0;
+    updates.is_banned = false;
+    updates.banned_until = null;
+  }
+
+  const updatedRecord = updateIpSecurityRecord(ip, updates);
+  res.json({
+    success: true,
+    record: updatedRecord,
+    message: `Updated IP ${ip}: perma_ban=${updatedRecord.perma_ban}`,
+  });
+});
+
 // Comprehensive AI Store Intelligence Analysis
 app.post("/api/gemini/analyze", async (req: Request, res: Response) => {
+  const clientIp = extractClientIp(req);
+
+  // Validate security, perma-ban & 15 req/3hr limit
+  const securityCheck = validateIpRequest(clientIp);
+  if (!securityCheck.allowed) {
+    return res.status(securityCheck.statusCode || 429).json({
+      success: false,
+      error: securityCheck.error,
+      record: securityCheck.record,
+      securityBlocked: true,
+    });
+  }
+
   try {
     const { inventorySummary, salesSummary, customQuestion } = req.body;
+
+    // Check customQuestion for gibberish if provided
+    if (customQuestion && typeof customQuestion === "string") {
+      const gibberishCheck = isGibberish(customQuestion);
+      if (gibberishCheck.isGibberish) {
+        const offense = handleGibberishOffense(clientIp, gibberishCheck.reason);
+        return res.status(offense.isBannedNow ? 429 : 400).json({
+          success: false,
+          error: offense.message,
+          warningCount: offense.warningCount,
+          isBannedNow: offense.isBannedNow,
+          bannedUntil: offense.bannedUntil,
+          isGibberish: true,
+        });
+      }
+    }
 
     const ai = getGeminiClient();
 
@@ -88,7 +175,7 @@ Please generate an actionable, professional, and clear retail report formatted s
       "name": "Item Name",
       "currentStock": 0,
       "recommendedReorderQty": 0,
-      "urgency": "CRITICAL" | "HIGH" | "MEDIUM"
+      "urgency": "CRITICAL"
     }
   ],
   "bundleOpportunities": [
@@ -116,10 +203,12 @@ Return ONLY valid JSON matching this schema. Do not enclose in markdown ticks if
       },
     });
 
+    // Record legitimate successful call
+    const updatedRecord = recordSuccessfulRequest(clientIp);
+
     const rawText = response.text || "{}";
     let parsedData;
     try {
-      // Clean possible backticks just in case
       const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
       parsedData = JSON.parse(cleaned);
     } catch {
@@ -137,6 +226,11 @@ Return ONLY valid JSON matching this schema. Do not enclose in markdown ticks if
       success: true,
       analysis: parsedData,
       generatedAt: new Date().toISOString(),
+      security: {
+        remainingRequests: Math.max(0, 15 - updatedRecord.request_count),
+        warningCount: updatedRecord.warning_count,
+        ip: clientIp,
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -150,8 +244,38 @@ Return ONLY valid JSON matching this schema. Do not enclose in markdown ticks if
 
 // Interactive AI Retail Copilot Chat
 app.post("/api/gemini/chat", async (req: Request, res: Response) => {
+  const clientIp = extractClientIp(req);
+
+  // 1. Validate security, perma-ban & 15 req/3hr limit
+  const securityCheck = validateIpRequest(clientIp);
+  if (!securityCheck.allowed) {
+    return res.status(securityCheck.statusCode || 429).json({
+      success: false,
+      error: securityCheck.error,
+      record: securityCheck.record,
+      securityBlocked: true,
+    });
+  }
+
   const { messages, storeContext } = req.body;
   const lastUserMsg = (messages || []).filter((m: any) => m.role === 'user').pop()?.content || '';
+
+  // 2. Check for Gibberish & prompt-injection
+  if (lastUserMsg) {
+    const gibberishCheck = isGibberish(lastUserMsg);
+    if (gibberishCheck.isGibberish) {
+      const offense = handleGibberishOffense(clientIp, gibberishCheck.reason);
+      return res.status(offense.isBannedNow ? 429 : 400).json({
+        success: false,
+        error: offense.message,
+        reply: offense.message,
+        warningCount: offense.warningCount,
+        isBannedNow: offense.isBannedNow,
+        bannedUntil: offense.bannedUntil,
+        isGibberish: true,
+      });
+    }
+  }
 
   try {
     if (!getGeminiApiKey()) {
@@ -167,7 +291,7 @@ You help grocery store cashiers and managers with:
 - Highlighting slow-moving or perishable inventory at risk
 - Suggesting grocery promotion bundles and pricing optimizations
 - Store Context Data: ${JSON.stringify(storeContext || {})}
-Format your answers cleanly with concise markdown bullet points, clear grocery advice, and actionable numbers.`;
+If a user prompt is unclear or marginally coherent, politely ask them to rephrase and refuse to engage in non-grocery random babbling. Format your answers cleanly with concise markdown bullet points, clear grocery advice, and actionable numbers.`;
 
     const contents = (messages || []).map((m: { role: string; content: string }) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -182,14 +306,25 @@ Format your answers cleanly with concise markdown bullet points, clear grocery a
       },
     });
 
+    // Record legitimate successful call
+    const updatedRecord = recordSuccessfulRequest(clientIp);
+
     res.json({
       success: true,
       reply: response.text || "I'm ready to assist with your grocery store operations.",
       source: "gemini-2.5-flash",
+      security: {
+        remainingRequests: Math.max(0, 15 - updatedRecord.request_count),
+        warningCount: updatedRecord.warning_count,
+        ip: clientIp,
+      },
     });
   } catch (error: unknown) {
     const err = error as Error;
     console.warn("Gemini Chat fallback triggered:", err.message);
+
+    // Record legitimate attempt
+    const updatedRecord = recordSuccessfulRequest(clientIp);
 
     // Context-grounded intelligent grocery store response
     const lowStockList = storeContext?.lowStockItems?.map((i: any) => `${i.name} (only ${i.stock} left)`).join(', ') || 'Honeycrisp Apples, Pasture Eggs, Spinach';
@@ -213,9 +348,15 @@ Format your answers cleanly with concise markdown bullet points, clear grocery a
       success: true,
       reply: fallbackReply,
       source: "store-engine",
+      security: {
+        remainingRequests: Math.max(0, 15 - updatedRecord.request_count),
+        warningCount: updatedRecord.warning_count,
+        ip: clientIp,
+      },
     });
   }
 });
+
 
 // Setup Vite middleware or Static serving
 async function startServer() {
